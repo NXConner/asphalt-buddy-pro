@@ -28,6 +28,8 @@ const [radarPlaying, setRadarPlaying] = useState<boolean>(false);
 const [radarSpeedMs, setRadarSpeedMs] = useState<number>(500);
 const [etaText, setEtaText] = useState<string>("");
 const [tips, setTips] = useState<string[]>([]);
+	const [trackingActive, setTrackingActive] = useState<boolean>(localStorage.getItem('bgTrackingEnabled') === 'true');
+	const [lastSyncTs, setLastSyncTs] = useState<number | null>(null);
 const [etaObj, setEtaObj] = useState<{ nextStart?: Date; nextStop?: Date; currentIntensityMmPerH?: number }>({});
 const [alertsEnabled, setAlertsEnabled] = useState<boolean>(false);
 	const [countyLayers, setCountyLayers] = useState({
@@ -194,6 +196,22 @@ useEffect(() => {
         }
     }
 }, [alertsEnabled, etaObj.nextStart?.getTime()]);
+
+	// Track background tracking state and sync events
+	useEffect(() => {
+		function onState(e: any) {
+			setTrackingActive(!!e.detail?.active);
+		}
+		function onSync(e: any) {
+			setLastSyncTs(e.detail?.lastSyncTs || Date.now());
+		}
+		window.addEventListener('bg-tracking-state', onState as any);
+		window.addEventListener('bg-tracking-sync', onSync as any);
+		return () => {
+			window.removeEventListener('bg-tracking-state', onState as any);
+			window.removeEventListener('bg-tracking-sync', onSync as any);
+		};
+	}, []);
 
 	useEffect(() => {
 		setHasGeolocation("geolocation" in navigator);
@@ -506,6 +524,21 @@ useEffect(() => {
 							localStorage.setItem('bgTrackingEnabled', enabled ? 'true' : 'false');
 							window.dispatchEvent(new CustomEvent('bg-tracking-toggle', { detail: { enabled } }));
 						}} defaultChecked={localStorage.getItem('bgTrackingEnabled') === 'true'} />
+						{trackingActive ? <span className="text-xs text-green-500">Active</span> : <span className="text-xs text-muted-foreground">Inactive</span>}
+						{lastSyncTs && <span className="text-xs text-muted-foreground">Last sync: {new Date(lastSyncTs).toLocaleTimeString()}</span>}
+					</div>
+					<div className="mt-2 flex items-center gap-2">
+						<label className="text-sm">Power saving</label>
+						<select className="border rounded px-2 py-1 text-sm" onChange={(e) => {
+							const mode = e.target.value;
+							// Balanced default: 50m / 30s. Power saving: 120m / 90s. High precision: 25m / 15s.
+							const cfg = mode === 'power' ? { distanceM: 120, minIntervalMs: 90000 } : mode === 'high' ? { distanceM: 25, minIntervalMs: 15000 } : { distanceM: 50, minIntervalMs: 30000 };
+							window.dispatchEvent(new CustomEvent('bg-tracking-config', { detail: cfg }));
+						}} defaultValue="balanced">
+							<option value="balanced">Balanced</option>
+							<option value="power">Power Saving</option>
+							<option value="high">High Precision</option>
+						</select>
 					</div>
 				</div>
 				<div className="rounded border p-3">
