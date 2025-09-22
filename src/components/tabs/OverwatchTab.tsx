@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MapContainer, TileLayer, LayersControl, ScaleControl, ZoomControl, Marker, Popup, useMap, Circle, WMSTileLayer } from "react-leaflet";
+import { MapContainer, TileLayer, LayersControl, ScaleControl, ZoomControl, Marker, Popup, useMap, Circle, WMSTileLayer, Polyline, Tooltip } from "react-leaflet";
 import { fetchRainviewer, fetchForecast, computeRainEta, generateWeatherTips } from "@/lib/weather";
 import { searchAddress, GeocodeResult } from "@/lib/geocode";
 import * as turf from "@turf/turf";
@@ -21,16 +21,72 @@ export function OverwatchTab() {
 	const [map, setMap] = useState<L.Map | null>(null);
 	const [totals, setTotals] = useState<{ areaSqM: number; lengthM: number }>({ areaSqM: 0, lengthM: 0 });
 	const [radiusM, setRadiusM] = useState<number>(5000);
-	const [radarFrames, setRadarFrames] = useState<string[]>([]);
-	const [radarIdx, setRadarIdx] = useState<number>(0);
-	const [etaText, setEtaText] = useState<string>("");
-	const [tips, setTips] = useState<string[]>([]);
+const [radarFrames, setRadarFrames] = useState<string[]>([]);
+const [radarIdx, setRadarIdx] = useState<number>(0);
+const [radarPlaying, setRadarPlaying] = useState<boolean>(false);
+const [radarSpeedMs, setRadarSpeedMs] = useState<number>(500);
+const [etaText, setEtaText] = useState<string>("");
+const [tips, setTips] = useState<string[]>([]);
+const [etaObj, setEtaObj] = useState<{ nextStart?: Date; nextStop?: Date; currentIntensityMmPerH?: number }>({});
+const [alertsEnabled, setAlertsEnabled] = useState<boolean>(false);
 	const [countyLayers, setCountyLayers] = useState({
 		patrickVA: { label: "Patrick County, VA", enabled: false, url: "", layers: "" },
 		henryVA: { label: "Henry County, VA", enabled: false, url: "", layers: "" },
 		stokesNC: { label: "Stokes County, NC", enabled: false, url: "", layers: "" },
 		surryNC: { label: "Surry County, NC", enabled: false, url: "", layers: "" },
 	});
+
+// Employee playback demo data and state
+type EmployeePathPoint = { lat: number; lng: number; t: number };
+type Employee = {
+    id: string;
+    name: string;
+    status: "off" | "on_shift" | "driving" | "onsite";
+    workHoursToday: string;
+    phone: string;
+    emergencyContact: string;
+    licenseUrl?: string;
+    validLicense: boolean;
+    path: EmployeePathPoint[];
+};
+
+const [employees] = useState<Employee[]>(() => {
+    const base = { lat: 36.5859718, lng: -79.86153 };
+    const now = Date.now();
+    function pt(dNorthM: number, dEastM: number, minutesAgo: number): EmployeePathPoint {
+        const dLat = dNorthM / 111320;
+        const dLng = dEastM / (111320 * Math.cos(base.lat * Math.PI / 180));
+        return { lat: base.lat + dLat, lng: base.lng + dLng, t: now - minutesAgo * 60_000 };
+    }
+    return [
+        {
+            id: "e1", name: "Alex Johnson", status: "driving", workHoursToday: "6h 12m", phone: "(555) 123-4567",
+            emergencyContact: "Sam (555) 234-5678", validLicense: true,
+            path: [pt(0,0,60), pt(300,200,45), pt(800,350,30), pt(1200,500,15), pt(1600,800,0)]
+        },
+        {
+            id: "e2", name: "Maria Garcia", status: "onsite", workHoursToday: "5h 03m", phone: "(555) 987-6543",
+            emergencyContact: "Lee (555) 876-5432", validLicense: true,
+            path: [pt(-500,-200,50), pt(-600,-250,40), pt(-650,-260,30), pt(-660,-265,20), pt(-660,-265,0)]
+        }
+    ];
+});
+const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+const [playbackIdx, setPlaybackIdx] = useState<number>(0);
+const [playbackPlaying, setPlaybackPlaying] = useState<boolean>(false);
+const [playbackSpeedMs, setPlaybackSpeedMs] = useState<number>(800);
+const selectedEmployee = useMemo(() => employees.find(e => e.id === selectedEmployeeId) || null, [employees, selectedEmployeeId]);
+const playbackPoint = selectedEmployee?.path?.[playbackIdx];
+const mph = useMemo(() => {
+    if (!selectedEmployee) return 0;
+    const a = selectedEmployee.path[playbackIdx - 1];
+    const b = selectedEmployee.path[playbackIdx];
+    if (!a || !b) return 0;
+    const dxKm = turf.distance([a.lng, a.lat], [b.lng, b.lat], { units: "kilometers" });
+    const dtH = (b.t - a.t) / 3_600_000;
+    const mphVal = dtH > 0 ? (dxKm * 0.621371) / dtH : 0;
+    return Math.max(0, Math.min(mphVal, 120));
+}, [selectedEmployee, playbackIdx]);
 
 	useEffect(() => {
 		(async () => {
@@ -58,8 +114,43 @@ useEffect(() => {
             setEtaText("No rain expected soon");
         }
         setTips(generateWeatherTips(eta, fc));
+        setEtaObj(eta);
     })();
 }, [position?.coords.latitude, position?.coords.longitude]);
+
+// Radar animation loop
+useEffect(() => {
+    if (!radarPlaying || radarFrames.length === 0) return;
+    const id = setInterval(() => {
+        setRadarIdx(i => (i + 1) % radarFrames.length);
+    }, radarSpeedMs);
+    return () => clearInterval(id);
+}, [radarPlaying, radarFrames.length, radarSpeedMs]);
+
+// Employee playback loop
+useEffect(() => {
+    if (!playbackPlaying || !selectedEmployee) return;
+    const id = setInterval(() => {
+        setPlaybackIdx(i => (i + 1) % selectedEmployee.path.length);
+    }, playbackSpeedMs);
+    return () => clearInterval(id);
+}, [playbackPlaying, selectedEmployee?.id, playbackSpeedMs]);
+
+// Notifications for rain alerts
+useEffect(() => {
+    if (!alertsEnabled) return;
+    if (typeof Notification === "undefined") return;
+    if (Notification.permission === "default") {
+        Notification.requestPermission();
+    }
+    if (Notification.permission !== "granted") return;
+    if (etaObj.nextStart) {
+        const mins = Math.max(0, Math.round((etaObj.nextStart.getTime() - Date.now()) / 60000));
+        if (mins <= 30) {
+            new Notification("Rain alert", { body: `Rain expected in ~${mins} minutes.` });
+        }
+    }
+}, [alertsEnabled, etaObj.nextStart?.getTime()]);
 
 	useEffect(() => {
 		setHasGeolocation("geolocation" in navigator);
@@ -280,6 +371,37 @@ useEffect(() => {
 					)}
 
 					{coords && <Circle center={[coords.lat, coords.lng]} radius={radiusM} pathOptions={{ color: "#3b82f6", weight: 1 }} />}
+
+                    {/* Employee path and moving marker */}
+                    {selectedEmployee && (
+                        <>
+                            <Polyline positions={selectedEmployee.path.map(p => [p.lat, p.lng] as [number, number])} pathOptions={{ color: "#22c55e", weight: 3 }} />
+                            {playbackPoint && (
+                                <Marker position={[playbackPoint.lat, playbackPoint.lng]}>
+                                    <Tooltip direction="top" offset={[0, -12]} opacity={1} permanent={false} sticky>
+                                        <div className="text-xs">
+                                            <div className="font-medium">{selectedEmployee.name}</div>
+                                            <div>Status: {selectedEmployee.status}</div>
+                                            <div>MPH: {mph.toFixed(1)}</div>
+                                        </div>
+                                    </Tooltip>
+                                    <Popup>
+                                        <div className="space-y-1 text-sm">
+                                            <div className="font-medium">{selectedEmployee.name}</div>
+                                            <div>Status: {selectedEmployee.status}</div>
+                                            <div>Work hours today: {selectedEmployee.workHoursToday}</div>
+                                            <div>Phone: {selectedEmployee.phone}</div>
+                                            <div>Emergency: {selectedEmployee.emergencyContact}</div>
+                                            <div>Driver license: {selectedEmployee.validLicense ? "Valid" : "Expired/Unknown"}</div>
+                                            {selectedEmployee.validLicense && selectedEmployee.licenseUrl && (
+                                                <a className="text-blue-500 underline" href={selectedEmployee.licenseUrl} target="_blank" rel="noreferrer">View License</a>
+                                            )}
+                                        </div>
+                                    </Popup>
+                                </Marker>
+                            )}
+                        </>
+                    )}
 					<DrawingTools />
 
 					{/* County WMS Overlays */}
@@ -329,8 +451,26 @@ useEffect(() => {
 						<li>Detect driver vs passenger (speed, motion, Bluetooth)</li>
 						<li>Work-hours device usage monitoring</li>
 					</ul>
-					<div className="mt-3 flex gap-2">
+					<div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
 						<button className="border rounded px-3 py-2" onClick={aiDetect}>AI Detect Asphalt (preview)</button>
+						<div className="flex items-center gap-2">
+							<label className="text-sm">Employee playback</label>
+							<select className="border rounded px-2 py-1" value={selectedEmployeeId ?? ""} onChange={(e) => { setSelectedEmployeeId(e.target.value || null); setPlaybackIdx(0); }}>
+								<option value="">Select employee</option>
+								{employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+							</select>
+						</div>
+						{selectedEmployee && (
+							<div className="flex items-center gap-2">
+								<button className="border rounded px-2 py-1" onClick={() => setPlaybackIdx(i => Math.max(i-1, 0))}>Prev</button>
+								<div className="text-xs text-muted-foreground">Point {playbackIdx + 1}/{selectedEmployee.path.length}</div>
+								<button className="border rounded px-2 py-1" onClick={() => setPlaybackIdx(i => Math.min(i+1, selectedEmployee.path.length-1))}>Next</button>
+								<button className="border rounded px-2 py-1" onClick={() => setPlaybackPlaying(p => !p)}>{playbackPlaying ? "Pause" : "Play"}</button>
+								<label className="text-xs text-muted-foreground">Speed</label>
+								<input type="range" min={200} max={1500} step={100} value={playbackSpeedMs} onChange={(e) => setPlaybackSpeedMs(parseInt(e.target.value))} />
+								<div className="text-xs">MPH: {mph.toFixed(1)}</div>
+							</div>
+						)}
 					</div>
 				</div>
 			</div>
@@ -381,6 +521,9 @@ useEffect(() => {
 						<button className="border rounded px-2 py-1" onClick={() => setRadarIdx((i) => (i - 1 + radarFrames.length) % radarFrames.length)}>Prev</button>
 						<div className="text-xs text-muted-foreground">Frame {radarIdx + 1}/{radarFrames.length}</div>
 						<button className="border rounded px-2 py-1" onClick={() => setRadarIdx((i) => (i + 1) % radarFrames.length)}>Next</button>
+						<button className="border rounded px-2 py-1" onClick={() => setRadarPlaying(p => !p)}>{radarPlaying ? "Pause" : "Play"}</button>
+						<label className="text-xs text-muted-foreground">Speed</label>
+						<input type="range" min={200} max={1500} step={100} value={radarSpeedMs} onChange={(e) => setRadarSpeedMs(parseInt(e.target.value))} />
 					</div>
 				)}
 				{tips.length > 0 && (
@@ -388,6 +531,10 @@ useEffect(() => {
 						{tips.map((t, idx) => <li key={idx}>{t}</li>)}
 					</ul>
 				)}
+				<div className="mt-3 flex items-center gap-2">
+					<label className="text-sm">Rain alerts</label>
+					<input type="checkbox" checked={alertsEnabled} onChange={(e) => setAlertsEnabled(e.target.checked)} />
+				</div>
 			</div>
 		</div>
 	);
