@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, LayersControl, ScaleControl, ZoomControl, Marker, Popup, useMap, Circle, WMSTileLayer, Polyline, Tooltip } from "react-leaflet";
 import { fetchRainviewer, fetchForecast, computeRainEta, generateWeatherTips } from "@/lib/weather";
+import { supabase } from "@/integrations/supabase/client";
 import { searchAddress, GeocodeResult } from "@/lib/geocode";
 import * as turf from "@turf/turf";
 import L from "leaflet";
@@ -71,6 +72,8 @@ const [employees] = useState<Employee[]>(() => {
         }
     ];
 });
+const [geofenceRings, setGeofenceRings] = useState<[number, number][][]>([]);
+const [realtimeEmployees, setRealtimeEmployees] = useState<Record<string, { lat: number; lng: number; speed?: number; ts: number }>>({});
 const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
 const [playbackIdx, setPlaybackIdx] = useState<number>(0);
 const [playbackPlaying, setPlaybackPlaying] = useState<boolean>(false);
@@ -117,6 +120,46 @@ useEffect(() => {
         setEtaObj(eta);
     })();
 }, [position?.coords.latitude, position?.coords.longitude]);
+
+// Supabase real-time employee location subscription
+useEffect(() => {
+    const sub = supabase
+        .channel('employee_locations')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_locations' }, (payload: any) => {
+            const row = payload.new || payload.record || payload;
+            if (!row) return;
+            setRealtimeEmployees(prev => ({
+                ...prev,
+                [row.employee_id]: { lat: row.latitude, lng: row.longitude, speed: row.speed ?? undefined, ts: Date.parse(row.timestamp || row.created_at || new Date().toISOString()) }
+            }));
+        })
+        .subscribe();
+    return () => { supabase.removeChannel(sub); };
+}, []);
+
+// Geofence detection: if any employee enters/exits a polygon, write to time_entries
+useEffect(() => {
+    const rings = geofenceRings;
+    if (rings.length === 0) return;
+    (async () => {
+        for (const [employeeId, p] of Object.entries(realtimeEmployees)) {
+            const point = turf.point([p.lng, p.lat]);
+            const inside = rings.some(r => turf.booleanPointInPolygon(point, turf.polygon([[...r, r[0]]])));
+            const nowIso = new Date().toISOString();
+            if (inside) {
+                const { error } = await supabase.from('time_entries').insert({ employee_id: employeeId, clock_in: nowIso, location_in: { lat: p.lat, lng: p.lng } as any }).select().single();
+                if (error) {
+                    // ignore
+                }
+            } else {
+                const { error } = await supabase.from('time_entries').update({ clock_out: nowIso, location_out: { lat: p.lat, lng: p.lng } as any }).eq('employee_id', employeeId).is('clock_out', null);
+                if (error) {
+                    // ignore
+                }
+            }
+        }
+    })();
+}, [geofenceRings, realtimeEmployees]);
 
 // Radar animation loop
 useEffect(() => {
@@ -177,7 +220,7 @@ useEffect(() => {
 		return null;
 	}
 
-	function DrawingTools() {
+ function DrawingTools({ onChange }: { onChange?: (polygons: [number, number][][]) => void }) {
 		const map = useMap();
 		const featureGroupRef = useRef<L.FeatureGroup | null>(null);
 
@@ -203,13 +246,14 @@ useEffect(() => {
 				return m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${m.toFixed(1)} m`;
 			}
 
-			function recalcTotals() {
+            function recalcTotals() {
 				let sumArea = 0;
 				let sumLen = 0;
+                const polys: [number, number][][] = [];
 				featureGroupRef.current?.eachLayer((layer: any) => {
 					if (layer.getLatLngs) {
 						const latlngs = layer.getLatLngs();
-						const ring: [number, number][] = (latlngs[0] as L.LatLng[]).map((ll: L.LatLng) => [ll.lng, ll.lat]);
+                        const ring: [number, number][] = (latlngs[0] as L.LatLng[]).map((ll: L.LatLng) => [ll.lng, ll.lat]);
 						if (ring.length > 2) {
 							const poly = turf.polygon([[...ring, ring[0]]]);
 							const area = turf.area(poly);
@@ -221,10 +265,12 @@ useEffect(() => {
 							if (layer.bindTooltip) {
 								layer.bindTooltip(label, { permanent: true, direction: "center", className: "bg-background/80 px-2 py-1 rounded text-xs" }).openTooltip();
 							}
+                            polys.push(ring);
 						}
 					}
 				});
 				setTotals({ areaSqM: sumArea, lengthM: sumLen });
+                onChange?.(polys);
 			}
 
 			map.on((L as any).Draw.Event.CREATED, (e: any) => {
@@ -244,7 +290,7 @@ useEffect(() => {
 			};
 		}, [map]);
 
-		return null;
+        return null;
 	}
 
 	function aiDetect() {
@@ -402,7 +448,20 @@ useEffect(() => {
                             )}
                         </>
                     )}
-					<DrawingTools />
+
+                    {/* Realtime employees (live positions) */}
+                    {Object.entries(realtimeEmployees).map(([empId, p]) => (
+                        <Marker key={empId} position={[p.lat, p.lng]}>
+                            <Tooltip direction="top" offset={[0, -12]} opacity={1}>
+                                <div className="text-xs">
+                                    <div className="font-medium">{empId}</div>
+                                    <div>MPH: {((p.speed ?? 0) * 2.23694).toFixed(1)}</div>
+                                    <div>{new Date(p.ts).toLocaleTimeString()}</div>
+                                </div>
+                            </Tooltip>
+                        </Marker>
+                    ))}
+                    <DrawingTools onChange={(polys) => setGeofenceRings(polys)} />
 
 					{/* County WMS Overlays */}
 					{countyLayers.patrickVA.enabled && countyLayers.patrickVA.url && countyLayers.patrickVA.layers && (
