@@ -1,10 +1,10 @@
+/* Leaflet CSS (must come before Tailwind directives) */
+@import "leaflet/dist/leaflet.css";
+@import "leaflet-draw/dist/leaflet.draw.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Leaflet CSS */
-@import "leaflet/dist/leaflet.css";
-@import "leaflet-draw/dist/leaflet.draw.css";
 
 /* Professional Asphalt Business Design System */
 @layer base {

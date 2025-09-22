@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MapContainer, TileLayer, LayersControl, ScaleControl, ZoomControl, Marker, Popup, useMap, Circle } from "react-leaflet";
+import { MapContainer, TileLayer, LayersControl, ScaleControl, ZoomControl, Marker, Popup, useMap, Circle, WMSTileLayer } from "react-leaflet";
 import { fetchRainviewer, fetchForecast, computeRainEta, generateWeatherTips } from "@/lib/weather";
 import { searchAddress, GeocodeResult } from "@/lib/geocode";
 import * as turf from "@turf/turf";
@@ -25,6 +25,12 @@ export function OverwatchTab() {
 	const [radarIdx, setRadarIdx] = useState<number>(0);
 	const [etaText, setEtaText] = useState<string>("");
 	const [tips, setTips] = useState<string[]>([]);
+	const [countyLayers, setCountyLayers] = useState({
+		patrickVA: { label: "Patrick County, VA", enabled: false, url: "", layers: "" },
+		henryVA: { label: "Henry County, VA", enabled: false, url: "", layers: "" },
+		stokesNC: { label: "Stokes County, NC", enabled: false, url: "", layers: "" },
+		surryNC: { label: "Surry County, NC", enabled: false, url: "", layers: "" },
+	});
 
 	useEffect(() => {
 		(async () => {
@@ -276,6 +282,20 @@ useEffect(() => {
 					{coords && <Circle center={[coords.lat, coords.lng]} radius={radiusM} pathOptions={{ color: "#3b82f6", weight: 1 }} />}
 					<DrawingTools />
 
+					{/* County WMS Overlays */}
+					{countyLayers.patrickVA.enabled && countyLayers.patrickVA.url && countyLayers.patrickVA.layers && (
+						<WMSTileLayer url={countyLayers.patrickVA.url} params={{ layers: countyLayers.patrickVA.layers, format: 'image/png', transparent: true }} opacity={0.7} />
+					)}
+					{countyLayers.henryVA.enabled && countyLayers.henryVA.url && countyLayers.henryVA.layers && (
+						<WMSTileLayer url={countyLayers.henryVA.url} params={{ layers: countyLayers.henryVA.layers, format: 'image/png', transparent: true }} opacity={0.7} />
+					)}
+					{countyLayers.stokesNC.enabled && countyLayers.stokesNC.url && countyLayers.stokesNC.layers && (
+						<WMSTileLayer url={countyLayers.stokesNC.url} params={{ layers: countyLayers.stokesNC.layers, format: 'image/png', transparent: true }} opacity={0.7} />
+					)}
+					{countyLayers.surryNC.enabled && countyLayers.surryNC.url && countyLayers.surryNC.layers && (
+						<WMSTileLayer url={countyLayers.surryNC.url} params={{ layers: countyLayers.surryNC.layers, format: 'image/png', transparent: true }} opacity={0.7} />
+					)}
+
 					{/* TODO: County layers (Patrick, Henry VA; Stokes, Surry NC) via WMS placeholders */}
 				</MapContainer>
 			</div>
@@ -312,6 +332,39 @@ useEffect(() => {
 					<div className="mt-3 flex gap-2">
 						<button className="border rounded px-3 py-2" onClick={aiDetect}>AI Detect Asphalt (preview)</button>
 					</div>
+				</div>
+			</div>
+
+			<div className="rounded border p-3">
+				<h3 className="font-medium mb-2">County GIS Overlays</h3>
+				<p className="text-xs text-muted-foreground mb-2">Toggle county layers. We'll wire official endpoints once available.</p>
+				<div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+					<label className="flex items-center gap-2 text-sm">
+						<input type="checkbox" checked={countyLayers.patrickVA.enabled} onChange={(e) => setCountyLayers(s => ({...s, patrickVA: {...s.patrickVA, enabled: e.target.checked}}))} />
+						<span>Patrick County, VA</span>
+					</label>
+					<label className="flex items-center gap-2 text-sm">
+						<input type="checkbox" checked={countyLayers.henryVA.enabled} onChange={(e) => setCountyLayers(s => ({...s, henryVA: {...s.henryVA, enabled: e.target.checked}}))} />
+						<span>Henry County, VA</span>
+					</label>
+					<label className="flex items-center gap-2 text-sm">
+						<input type="checkbox" checked={countyLayers.stokesNC.enabled} onChange={(e) => setCountyLayers(s => ({...s, stokesNC: {...s.stokesNC, enabled: e.target.checked}}))} />
+						<span>Stokes County, NC</span>
+					</label>
+					<label className="flex items-center gap-2 text-sm">
+						<input type="checkbox" checked={countyLayers.surryNC.enabled} onChange={(e) => setCountyLayers(s => ({...s, surryNC: {...s.surryNC, enabled: e.target.checked}}))} />
+						<span>Surry County, NC</span>
+					</label>
+				</div>
+				<div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+					<input className="border rounded px-2 py-1 text-sm" placeholder="Patrick WMS URL" value={countyLayers.patrickVA.url} onChange={(e) => setCountyLayers(s => ({...s, patrickVA: {...s.patrickVA, url: e.target.value}}))} />
+					<input className="border rounded px-2 py-1 text-sm" placeholder="Patrick WMS Layers" value={countyLayers.patrickVA.layers} onChange={(e) => setCountyLayers(s => ({...s, patrickVA: {...s.patrickVA, layers: e.target.value}}))} />
+					<input className="border rounded px-2 py-1 text-sm" placeholder="Henry WMS URL" value={countyLayers.henryVA.url} onChange={(e) => setCountyLayers(s => ({...s, henryVA: {...s.henryVA, url: e.target.value}}))} />
+					<input className="border rounded px-2 py-1 text-sm" placeholder="Henry WMS Layers" value={countyLayers.henryVA.layers} onChange={(e) => setCountyLayers(s => ({...s, henryVA: {...s.henryVA, layers: e.target.value}}))} />
+					<input className="border rounded px-2 py-1 text-sm" placeholder="Stokes WMS URL" value={countyLayers.stokesNC.url} onChange={(e) => setCountyLayers(s => ({...s, stokesNC: {...s.stokesNC, url: e.target.value}}))} />
+					<input className="border rounded px-2 py-1 text-sm" placeholder="Stokes WMS Layers" value={countyLayers.stokesNC.layers} onChange={(e) => setCountyLayers(s => ({...s, stokesNC: {...s.stokesNC, layers: e.target.value}}))} />
+					<input className="border rounded px-2 py-1 text-sm" placeholder="Surry WMS URL" value={countyLayers.surryNC.url} onChange={(e) => setCountyLayers(s => ({...s, surryNC: {...s.surryNC, url: e.target.value}}))} />
+					<input className="border rounded px-2 py-1 text-sm" placeholder="Surry WMS Layers" value={countyLayers.surryNC.layers} onChange={(e) => setCountyLayers(s => ({...s, surryNC: {...s.surryNC, layers: e.target.value}}))} />
 				</div>
 			</div>
 
