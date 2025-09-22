@@ -65,7 +65,7 @@ const AsphaltEstimator = () => {
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           {/* OverWatch top tab */}
-          <TabsList className="w-full grid grid-cols-1 mb-2 bg-primary text-primary-foreground">
+          <TabsList className="w-full mb-2 bg-primary text-primary-foreground relative z-10 justify-center">
             <TabsTrigger
               value="overwatch"
               className="text-center p-3 font-semibold"
@@ -73,14 +73,14 @@ const AsphaltEstimator = () => {
               OverWatch System Command
             </TabsTrigger>
           </TabsList>
-          <TabsList className="grid w-full grid-cols-6 lg:grid-cols-11 mb-6 bg-card/50 backdrop-blur-sm">
+          <TabsList className="w-full mb-6 bg-card/50 backdrop-blur-sm flex flex-wrap gap-1 !h-auto">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               return (
                 <TabsTrigger
                   key={tab.id}
                   value={tab.id}
-                  className="flex flex-col items-center gap-1 p-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                  className="shrink-0 flex flex-col items-center gap-1 p-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                 >
                   <Icon className="h-4 w-4" />
                   <span className="text-xs hidden lg:block">{tab.label}</span>
