@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Calculator, Settings, Users, FileText, DollarSign, FolderOpen, Palette, User, BookOpen, Sparkles } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { EstimatorTab } from "./tabs/EstimatorTab";
 import { SettingsTab } from "./tabs/SettingsTab";
 import { CustomersTab } from "./tabs/CustomersTab";
@@ -12,9 +13,11 @@ import { PremiumServicesTab } from "./tabs/PremiumServicesTab";
 import { BestPracticesTab } from "./tabs/BestPracticesTab";
 import { ProfileTab } from "./tabs/ProfileTab";
 import { UISettingsTab } from "./tabs/UISettingsTab";
+import { DraggableCalculator } from "./tabs/DraggableCalculator";
 
 const AsphaltEstimator = () => {
   const [activeTab, setActiveTab] = useState("estimator");
+  const [showCalculator, setShowCalculator] = useState(false);
 
   const tabs = [
     { id: "estimator", label: "Estimator", icon: Calculator },
@@ -35,12 +38,27 @@ const AsphaltEstimator = () => {
       <div className="container mx-auto p-6">
         {/* Header */}
         <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold gradient-text mb-2">
-            Asphalt Business Estimator
-          </h1>
-          <p className="text-muted-foreground text-lg">
-            Professional estimation and job management for asphalt maintenance
-          </p>
+          <div className="flex justify-between items-start">
+            <div className="flex-1">
+              <h1 className="text-4xl font-bold gradient-text mb-2">
+                Asphalt Business Estimator
+              </h1>
+              <p className="text-muted-foreground text-lg">
+                Professional estimation and job management for asphalt maintenance
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCalculator(true)}
+                className="flex items-center gap-2"
+              >
+                <Calculator className="h-4 w-4" />
+                Calculator
+              </Button>
+            </div>
+          </div>
         </div>
 
         {/* Main Tabs */}
@@ -106,6 +124,12 @@ const AsphaltEstimator = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Draggable Calculator */}
+      <DraggableCalculator 
+        isOpen={showCalculator}
+        onClose={() => setShowCalculator(false)}
+      />
     </div>
   );
 };
