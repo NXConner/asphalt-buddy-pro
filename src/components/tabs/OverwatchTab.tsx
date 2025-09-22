@@ -3,7 +3,10 @@ import { MapContainer, TileLayer, LayersControl, ScaleControl, ZoomControl, Mark
 import { fetchRainviewer, fetchForecast, computeRainEta, generateWeatherTips } from "@/lib/weather";
 import { supabase } from "@/integrations/supabase/client";
 import { searchAddress, GeocodeResult } from "@/lib/geocode";
-import * as turf from "@turf/turf";
+import area from "@turf/area";
+import distance from "@turf/distance";
+import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
+import { polygon } from "@turf/helpers";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
@@ -87,7 +90,7 @@ const mph = useMemo(() => {
     const a = selectedEmployee.path[playbackIdx - 1];
     const b = selectedEmployee.path[playbackIdx];
     if (!a || !b) return 0;
-    const dxKm = turf.distance([a.lng, a.lat], [b.lng, b.lat], { units: "kilometers" });
+    const dxKm = distance([a.lng, a.lat], [b.lng, b.lat], { units: "kilometers" });
     const dtH = (b.t - a.t) / 3_600_000;
     const mphVal = dtH > 0 ? (dxKm * 0.621371) / dtH : 0;
     return Math.max(0, Math.min(mphVal, 120));
@@ -144,9 +147,10 @@ useEffect(() => {
     const rings = geofenceRings;
     if (rings.length === 0) return;
     (async () => {
-        for (const [employeeId, p] of Object.entries(realtimeEmployees)) {
-            const point = turf.point([p.lng, p.lat]);
-            const inside = rings.some(r => turf.booleanPointInPolygon(point, turf.polygon([[...r, r[0]]])));
+        const entries = Object.entries(realtimeEmployees) as Array<[string, { lat: number; lng: number; speed?: number; ts: number }]>;
+        for (const [employeeId, p] of entries) {
+            const point = [p.lng, p.lat] as [number, number];
+            const inside = rings.some(r => booleanPointInPolygon(point, polygon([[...r, r[0]]])));
             const nowIso = new Date().toISOString();
             if (inside) {
                 const { error } = await supabase.from('time_entries').insert({ employee_id: employeeId, clock_in: nowIso, location_in: { lat: p.lat, lng: p.lng } as any }).select().single();
@@ -273,13 +277,19 @@ useEffect(() => {
 						const latlngs = layer.getLatLngs();
                         const ring: [number, number][] = (latlngs[0] as L.LatLng[]).map((ll: L.LatLng) => [ll.lng, ll.lat]);
 						if (ring.length > 2) {
-							const poly = turf.polygon([[...ring, ring[0]]]);
-							const area = turf.area(poly);
-							const perim = turf.length(poly, { units: "kilometers" }) * 1000;
-							sumArea += area;
-							sumLen += perim;
-							const acres = area / 4046.8564224;
-							const label = `${acres.toFixed(2)} ac • ${formatMeters(perim)}`;
+                            const poly = polygon([[...ring, ring[0]]]);
+                            const aSqM = area(poly);
+                            let perim = 0;
+                            for (let i = 0; i < ring.length; i++) {
+                                const p1 = ring[i];
+                                const p2 = ring[(i + 1) % ring.length];
+                                perim += distance([p1[0], p1[1]], [p2[0], p2[1]], { units: "kilometers" });
+                            }
+                            perim *= 1000;
+                            sumArea += aSqM;
+                            sumLen += perim;
+                            const acres = aSqM / 4046.8564224;
+                            const label = `${acres.toFixed(2)} ac • ${formatMeters(perim)}`;
 							if (layer.bindTooltip) {
 								layer.bindTooltip(label, { permanent: true, direction: "center", className: "bg-background/80 px-2 py-1 rounded text-xs" }).openTooltip();
 							}
@@ -468,7 +478,7 @@ useEffect(() => {
                     )}
 
                     {/* Realtime employees (live positions) */}
-                    {Object.entries(realtimeEmployees).map(([empId, p]) => (
+                    {(Object.entries(realtimeEmployees) as Array<[string, { lat: number; lng: number; speed?: number; ts: number }]>).map(([empId, p]) => (
                         <Marker key={empId} position={[p.lat, p.lng]}>
                             <Tooltip direction="top" offset={[0, -12]} opacity={1}>
                                 <div className="text-xs">
