@@ -18,9 +18,9 @@ export default defineConfig(({ mode }) => ({
       includeAssets: [
         "favicon.ico",
         "robots.txt",
-        { src: "pwa-192x192.png", sizes: "192x192", purpose: "any" },
-        { src: "pwa-512x512.png", sizes: "512x512", purpose: "any" },
-        { src: "pwa-512x512-maskable.png", sizes: "512x512", purpose: "maskable" }
+        "pwa-192x192.png",
+        "pwa-512x512.png",
+        "pwa-512x512-maskable.png"
       ],
       manifest: {
         name: "OverWatch - Operational Map & Tracking",
