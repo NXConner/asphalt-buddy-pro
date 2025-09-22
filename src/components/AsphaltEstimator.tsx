@@ -3,6 +3,7 @@ import { Calculator, Settings, Users, FileText, DollarSign, FolderOpen, Palette,
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { EstimatorTab } from "./tabs/EstimatorTab";
+import { OverwatchTab } from "./tabs/OverwatchTab";
 import { SettingsTab } from "./tabs/SettingsTab";
 import { CustomersTab } from "./tabs/CustomersTab";
 import { InvoicesTab } from "./tabs/InvoicesTab";
@@ -63,6 +64,15 @@ const AsphaltEstimator = () => {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          {/* OverWatch top tab */}
+          <TabsList className="w-full grid grid-cols-1 mb-2 bg-primary text-primary-foreground">
+            <TabsTrigger
+              value="overwatch"
+              className="text-center p-3 font-semibold"
+            >
+              OverWatch System Command
+            </TabsTrigger>
+          </TabsList>
           <TabsList className="grid w-full grid-cols-6 lg:grid-cols-11 mb-6 bg-card/50 backdrop-blur-sm">
             {tabs.map((tab) => {
               const Icon = tab.icon;
@@ -78,6 +88,10 @@ const AsphaltEstimator = () => {
               );
             })}
           </TabsList>
+
+          <TabsContent value="overwatch" className="space-y-6">
+            <OverwatchTab />
+          </TabsContent>
 
           <TabsContent value="estimator" className="space-y-6">
             <EstimatorTab />
