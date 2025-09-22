@@ -499,6 +499,14 @@ useEffect(() => {
 						<input type="range" min={500} max={20000} step={500} value={radiusM} onChange={(e) => setRadiusM(parseInt(e.target.value))} />
 						<span className="text-xs text-muted-foreground">{Math.round(radiusM/1000)} km</span>
 					</div>
+					<div className="mt-2 flex items-center gap-2">
+						<label className="text-sm">Background tracking</label>
+						<input type="checkbox" onChange={(e) => {
+							const enabled = e.target.checked;
+							localStorage.setItem('bgTrackingEnabled', enabled ? 'true' : 'false');
+							window.dispatchEvent(new CustomEvent('bg-tracking-toggle', { detail: { enabled } }));
+						}} defaultChecked={localStorage.getItem('bgTrackingEnabled') === 'true'} />
+					</div>
 				</div>
 				<div className="rounded border p-3">
 					<h3 className="font-medium mb-2">Operations</h3>
