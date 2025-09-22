@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MapContainer, TileLayer, LayersControl, ScaleControl, ZoomControl, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, LayersControl, ScaleControl, ZoomControl, Marker, Popup, useMap, Circle } from "react-leaflet";
+import { fetchRainviewer, fetchForecast, computeRainEta, generateWeatherTips } from "@/lib/weather";
 import { searchAddress, GeocodeResult } from "@/lib/geocode";
 import * as turf from "@turf/turf";
 import L from "leaflet";
@@ -19,6 +20,40 @@ export function OverwatchTab() {
 	const [selectedResult, setSelectedResult] = useState<GeocodeResult | null>(null);
 	const [map, setMap] = useState<L.Map | null>(null);
 	const [totals, setTotals] = useState<{ areaSqM: number; lengthM: number }>({ areaSqM: 0, lengthM: 0 });
+	const [radiusM, setRadiusM] = useState<number>(5000);
+	const [radarFrames, setRadarFrames] = useState<string[]>([]);
+	const [radarIdx, setRadarIdx] = useState<number>(0);
+	const [etaText, setEtaText] = useState<string>("");
+	const [tips, setTips] = useState<string[]>([]);
+
+	useEffect(() => {
+		(async () => {
+			const rv = await fetchRainviewer();
+			if (rv) {
+				const host = (rv as any).host || "https://tilecache.rainviewer.com";
+				const frames = [...(rv.radar.past || []), ...(rv.radar.nowcast || [])].map(f => `${host}${f.path}/512/{z}/{x}/{y}/2/1_1.png`);
+				setRadarFrames(frames);
+			}
+		})();
+	}, []);
+
+useEffect(() => {
+    (async () => {
+        // Wait until coords computed
+        const c = position ? { lat: position.coords.latitude, lng: position.coords.longitude } : null;
+        if (!c) return;
+        const fc = await fetchForecast(c.lat, c.lng);
+        const eta = computeRainEta(new Date(), fc);
+        if (eta.nextStart) {
+            const mins = Math.max(0, Math.round((eta.nextStart.getTime() - Date.now()) / 60000));
+            const stopMins = eta.nextStop ? Math.max(0, Math.round((eta.nextStop.getTime() - Date.now()) / 60000)) : undefined;
+            setEtaText(stopMins !== undefined ? `Rain in ~${mins} min, clearing around ~${stopMins} min` : `Rain in ~${mins} min`);
+        } else {
+            setEtaText("No rain expected soon");
+        }
+        setTips(generateWeatherTips(eta, fc));
+    })();
+}, [position?.coords.latitude, position?.coords.longitude]);
 
 	useEffect(() => {
 		setHasGeolocation("geolocation" in navigator);
@@ -221,6 +256,11 @@ export function OverwatchTab() {
 						<LayersControl.BaseLayer checked={provider === "esri"} name="ESRI Imagery">
 							<TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" attribution="Tiles &copy; Esri" />
 						</LayersControl.BaseLayer>
+						{radarFrames.length > 0 && (
+							<LayersControl.Overlay checked name="Radar (RainViewer)">
+								<TileLayer url={radarFrames[radarIdx % radarFrames.length]} opacity={0.6} />
+							</LayersControl.Overlay>
+						)}
 					</LayersControl>
 
 					{coords && (
@@ -233,6 +273,7 @@ export function OverwatchTab() {
 						<MapFlyTo lat={parseFloat(selectedResult.lat)} lon={parseFloat(selectedResult.lon)} />
 					)}
 
+					{coords && <Circle center={[coords.lat, coords.lng]} radius={radiusM} pathOptions={{ color: "#3b82f6", weight: 1 }} />}
 					<DrawingTools />
 
 					{/* TODO: County layers (Patrick, Henry VA; Stokes, Surry NC) via WMS placeholders */}
@@ -252,6 +293,11 @@ export function OverwatchTab() {
 						<p className="text-sm text-muted-foreground">Awaiting location...</p>
 					)}
 					{error && <p className="text-sm text-red-500">{error}</p>}
+					<div className="mt-3 flex items-center gap-2">
+						<label className="text-sm">Alert radius</label>
+						<input type="range" min={500} max={20000} step={500} value={radiusM} onChange={(e) => setRadiusM(parseInt(e.target.value))} />
+						<span className="text-xs text-muted-foreground">{Math.round(radiusM/1000)} km</span>
+					</div>
 				</div>
 				<div className="rounded border p-3">
 					<h3 className="font-medium mb-2">Operations</h3>
@@ -272,6 +318,23 @@ export function OverwatchTab() {
 			<div className="rounded border p-3">
 				<h3 className="font-medium mb-2">Measurements</h3>
 				<div className="text-sm text-muted-foreground">Total area: {(totals.areaSqM / 4046.8564224).toFixed(2)} acres • Total perimeter: {totals.lengthM.toFixed(1)} m</div>
+			</div>
+
+			<div className="rounded border p-3">
+				<h3 className="font-medium mb-2">Rain Radar & Forecast</h3>
+				<div className="text-sm mb-2">{etaText}</div>
+				{radarFrames.length > 0 && (
+					<div className="flex items-center gap-3">
+						<button className="border rounded px-2 py-1" onClick={() => setRadarIdx((i) => (i - 1 + radarFrames.length) % radarFrames.length)}>Prev</button>
+						<div className="text-xs text-muted-foreground">Frame {radarIdx + 1}/{radarFrames.length}</div>
+						<button className="border rounded px-2 py-1" onClick={() => setRadarIdx((i) => (i + 1) % radarFrames.length)}>Next</button>
+					</div>
+				)}
+				{tips.length > 0 && (
+					<ul className="list-disc list-inside text-sm text-muted-foreground mt-3 space-y-1">
+						{tips.map((t, idx) => <li key={idx}>{t}</li>)}
+					</ul>
+				)}
 			</div>
 		</div>
 	);
