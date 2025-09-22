@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { Suspense, useEffect, useRef, useState, lazy } from "react";
 import { Calculator, Settings, Users, FileText, DollarSign, FolderOpen, Palette, User, BookOpen, Sparkles } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { EstimatorTab } from "./tabs/EstimatorTab";
-import { OverwatchTab } from "./tabs/OverwatchTab";
+const OverwatchTab = lazy(() => import("./tabs/OverwatchTab").then(m => ({ default: m.OverwatchTab })));
 import { SettingsTab } from "./tabs/SettingsTab";
 import { CustomersTab } from "./tabs/CustomersTab";
 import { InvoicesTab } from "./tabs/InvoicesTab";
@@ -18,7 +18,32 @@ import { DraggableCalculator } from "./tabs/DraggableCalculator";
 
 const AsphaltEstimator = () => {
   const [activeTab, setActiveTab] = useState("estimator");
+  const overwatchTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [showCalculator, setShowCalculator] = useState(false);
+
+  useEffect(() => {
+    // Prefetch the OverwatchTab module during idle and when the trigger is visible
+    const idleId = (window as any).requestIdleCallback?.(() => {
+      import("./tabs/OverwatchTab");
+    });
+    const el = overwatchTriggerRef.current;
+    if (el && "IntersectionObserver" in window) {
+      const io = new IntersectionObserver((entries) => {
+        if (entries.some(e => e.isIntersecting)) {
+          import("./tabs/OverwatchTab");
+          io.disconnect();
+        }
+      }, { rootMargin: "200px" });
+      io.observe(el);
+      return () => {
+        io.disconnect();
+        if ((window as any).cancelIdleCallback && idleId) (window as any).cancelIdleCallback(idleId);
+      };
+    }
+    return () => {
+      if ((window as any).cancelIdleCallback && idleId) (window as any).cancelIdleCallback(idleId);
+    };
+  }, []);
 
   const tabs = [
     { id: "estimator", label: "Estimator", icon: Calculator },
@@ -69,6 +94,8 @@ const AsphaltEstimator = () => {
             <TabsTrigger
               value="overwatch"
               className="text-center p-3 font-semibold"
+              ref={overwatchTriggerRef}
+              onMouseEnter={() => { import("./tabs/OverwatchTab"); }}
             >
               OverWatch System Command
             </TabsTrigger>
@@ -90,7 +117,9 @@ const AsphaltEstimator = () => {
           </TabsList>
 
           <TabsContent value="overwatch" className="space-y-6">
-            <OverwatchTab />
+            <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Loading map module…</div>}>
+              <OverwatchTab />
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="estimator" className="space-y-6">

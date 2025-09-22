@@ -13,6 +13,7 @@ const queryClient = new QueryClient();
 
 const App = () => {
   const watcherIdRef = useRef<string | null>(null);
+  const userIdRef = useRef<string | null>(null);
   const lastSentRef = useRef<{ t: number; lat: number; lng: number }>({ t: 0, lat: 0, lng: 0 });
   const queueRef = useRef<any[]>([]);
   const flushTimerRef = useRef<any>(null);
@@ -45,8 +46,11 @@ const App = () => {
           },
           async (location: any, error: any) => {
             if (error || !location) return;
-            const user = await supabase.auth.getUser();
-            const employeeId = user.data.user?.id;
+            if (!userIdRef.current) {
+              const user = await supabase.auth.getUser();
+              userIdRef.current = user.data.user?.id ?? null;
+            }
+            const employeeId = userIdRef.current;
             if (!employeeId) return;
 
             const now = Date.now();
