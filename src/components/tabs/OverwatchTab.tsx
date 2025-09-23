@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+// removed explicit React ref type import to avoid type export issues
 import { MapContainer, TileLayer, LayersControl, ScaleControl, ZoomControl, Marker, Popup, useMap, Circle, WMSTileLayer, Polyline, Tooltip, FeatureGroup } from "react-leaflet";
 import { fetchRainviewer, fetchForecast, computeRainEta, generateWeatherTips } from "@/lib/weather";
 import { supabase } from "@/integrations/supabase/client";
@@ -197,6 +198,11 @@ const [employees] = useState<Employee[]>(() => {
 });
 const [geofenceRings, setGeofenceRings] = useState<[number, number][][]>([]);
 const [realtimeEmployees, setRealtimeEmployees] = useState<Record<string, { lat: number; lng: number; speed?: number; ts: number }>>({});
+const lastInsideRef = useRef<Record<string, boolean>>({});
+const lastTransitionRef = useRef<Record<string, number>>({});
+const drawGroupRef = useRef<L.FeatureGroup | null>(null);
+const [selfOnShift, setSelfOnShift] = useState<boolean>(false);
+const [clockBusy, setClockBusy] = useState<boolean>(false);
 const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
 const [playbackIdx, setPlaybackIdx] = useState<number>(0);
 const [playbackPlaying, setPlaybackPlaying] = useState<boolean>(false);
@@ -260,7 +266,7 @@ useEffect(() => {
     return () => { supabase.removeChannel(sub); };
 }, []);
 
-// Geofence detection: if any employee enters/exits a polygon, write to time_entries
+// Geofence detection with transition awareness and debouncing
 useEffect(() => {
     const rings = geofenceRings;
     if (rings.length === 0) return;
@@ -269,21 +275,124 @@ useEffect(() => {
         for (const [employeeId, p] of entries) {
             const point = [p.lng, p.lat] as [number, number];
             const inside = rings.some(r => booleanPointInPolygon(point, polygon([[...r, r[0]]])));
-            const nowIso = new Date().toISOString();
-            if (inside) {
-                const { error } = await supabase.from('time_entries').insert({ employee_id: employeeId, clock_in: nowIso, location_in: { lat: p.lat, lng: p.lng } as any }).select().single();
-                if (error) {
-                    // ignore
+            const prev = !!lastInsideRef.current[employeeId];
+            if (inside === prev) continue;
+            const now = Date.now();
+            const lastTs = lastTransitionRef.current[employeeId] || 0;
+            if (now - lastTs < 15000) continue; // debounce 15s to avoid GPS jitter
+            lastTransitionRef.current[employeeId] = now;
+            const nowIso = new Date(now).toISOString();
+            try {
+                if (inside && !prev) {
+                    const open = await supabase
+                        .from('time_entries')
+                        .select('*')
+                        .eq('employee_id', employeeId)
+                        .is('clock_out', null)
+                        .order('clock_in', { ascending: false })
+                        .limit(1)
+                        .maybeSingle();
+                    if (!open.data) {
+                        await supabase.from('time_entries').insert({
+                            employee_id: employeeId,
+                            clock_in: nowIso,
+                            location_in: { lat: p.lat, lng: p.lng } as any
+                        });
+                    }
+                    lastInsideRef.current[employeeId] = true;
+                } else if (!inside && prev) {
+                    const open = await supabase
+                        .from('time_entries')
+                        .select('*')
+                        .eq('employee_id', employeeId)
+                        .is('clock_out', null)
+                        .order('clock_in', { ascending: false })
+                        .limit(1)
+                        .maybeSingle();
+                    if (open.data) {
+                        const clockInMs = Date.parse(open.data.clock_in);
+                        const totalHours = Math.max(0, (now - clockInMs) / 3_600_000);
+                        await supabase
+                            .from('time_entries')
+                            .update({
+                                clock_out: nowIso,
+                                location_out: { lat: p.lat, lng: p.lng } as any,
+                                total_hours: Number(totalHours.toFixed(2))
+                            })
+                            .eq('id', open.data.id);
+                    }
+                    lastInsideRef.current[employeeId] = false;
                 }
-            } else {
-                const { error } = await supabase.from('time_entries').update({ clock_out: nowIso, location_out: { lat: p.lat, lng: p.lng } as any }).eq('employee_id', employeeId).is('clock_out', null);
-                if (error) {
-                    // ignore
-                }
-            }
+            } catch {}
         }
     })();
 }, [geofenceRings, realtimeEmployees]);
+
+// Resolve current user's on-shift state for manual controls
+useEffect(() => {
+    (async () => {
+        try {
+            const u = await supabase.auth.getUser();
+            const employeeId = u.data.user?.id;
+            if (!employeeId) return;
+            const open = await supabase
+                .from('time_entries')
+                .select('id')
+                .eq('employee_id', employeeId)
+                .is('clock_out', null)
+                .limit(1);
+            setSelfOnShift((open.data?.length ?? 0) > 0);
+        } catch {}
+    })();
+}, []);
+
+async function manualClockIn() {
+    if (clockBusy) return; setClockBusy(true);
+    try {
+        const u = await supabase.auth.getUser();
+        const employeeId = u.data.user?.id;
+        if (!employeeId) return;
+        const open = await supabase.from('time_entries').select('id').eq('employee_id', employeeId).is('clock_out', null).limit(1);
+        if ((open.data?.length ?? 0) === 0) {
+            const nowIso = new Date().toISOString();
+            await supabase.from('time_entries').insert({
+                employee_id: employeeId,
+                clock_in: nowIso,
+                location_in: coords ? ({ lat: coords.lat, lng: coords.lng } as any) : null
+            });
+        }
+        setSelfOnShift(true);
+    } catch {} finally { setClockBusy(false); }
+}
+
+async function manualClockOut() {
+    if (clockBusy) return; setClockBusy(true);
+    try {
+        const u = await supabase.auth.getUser();
+        const employeeId = u.data.user?.id;
+        if (!employeeId) return;
+        const open = await supabase
+            .from('time_entries')
+            .select('*')
+            .eq('employee_id', employeeId)
+            .is('clock_out', null)
+            .order('clock_in', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        if (open.data) {
+            const now = Date.now();
+            const nowIso = new Date(now).toISOString();
+            const clockInMs = Date.parse(open.data.clock_in);
+            const totalHours = Math.max(0, (now - clockInMs) / 3_600_000);
+            await supabase.from('time_entries').update({
+                clock_out: nowIso,
+                location_out: coords ? ({ lat: coords.lat, lng: coords.lng } as any) : null,
+                total_hours: Number(totalHours.toFixed(2))
+            }).eq('id', open.data.id);
+        }
+        setSelfOnShift(false);
+    } catch {} finally { setClockBusy(false); }
+}
 
 // Radar animation loop
 useEffect(() => {
@@ -382,7 +491,7 @@ useEffect(() => {
 		}
 	}, [map, selectedResult?.lat, selectedResult?.lon, selectedResult?.boundingbox?.[0], selectedResult?.boundingbox?.[1], selectedResult?.boundingbox?.[2], selectedResult?.boundingbox?.[3]]);
 
- function DrawingTools({ onChange }: { onChange?: (polygons: [number, number][][]) => void }) {
+function DrawingTools({ onChange, groupRef }: { onChange?: (polygons: [number, number][][]) => void, groupRef?: { current: L.FeatureGroup | null } }) {
 		const map = useMap();
 		const featureGroupRef = useRef<L.FeatureGroup | null>(null);
 
@@ -390,6 +499,7 @@ useEffect(() => {
 			if (!map) return;
 			const group = new L.FeatureGroup();
 			featureGroupRef.current = group;
+			if (groupRef) groupRef.current = group;
 			map.addLayer(group);
 
 			const drawControl = new (L as any).Control.Draw({
@@ -455,6 +565,7 @@ useEffect(() => {
 			return () => {
 				map.removeLayer(group);
 				map.removeControl(drawControl);
+				if (groupRef) groupRef.current = null;
 			};
 		}, [map]);
 
@@ -769,7 +880,7 @@ useEffect(() => {
                             </Tooltip>
                         </Marker>
                     ))}
-                    <DrawingTools onChange={(polys) => setGeofenceRings(polys)} />
+                    <DrawingTools onChange={(polys) => setGeofenceRings(polys)} groupRef={drawGroupRef} />
 
 				</MapContainer>
 			</div>
@@ -828,12 +939,19 @@ useEffect(() => {
 					</ul>
 					<div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
 						<button className="border rounded px-3 py-2 active:scale-95 transition-transform" onClick={aiDetect} disabled={detecting}>{detecting ? "Detecting…" : "AI Detect Asphalt"}</button>
+						<button className="border rounded px-3 py-2 active:scale-95 transition-transform" onClick={() => { try { drawGroupRef.current?.clearLayers(); } catch {} setGeofenceRings([]); setTotals({ areaSqM: 0, lengthM: 0 }); }}>Clear Shapes</button>
 						<div className="flex items-center gap-2">
 							<label className="text-sm">Employee playback</label>
 							<select className="border rounded px-2 py-1" value={selectedEmployeeId ?? ""} onChange={(e) => { setSelectedEmployeeId(e.target.value || null); setPlaybackIdx(0); }}>
 								<option value="">Select employee</option>
 								{employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
 							</select>
+						</div>
+						<div className="flex items-center gap-2">
+							<label className="text-sm">My shift</label>
+							<span className={"text-xs " + (selfOnShift ? "text-green-600" : "text-muted-foreground")}>{selfOnShift ? "On shift" : "Off shift"}</span>
+							<button disabled={clockBusy || selfOnShift} className="border rounded px-2 py-1 disabled:opacity-60" onClick={() => { void manualClockIn(); }}>Clock In</button>
+							<button disabled={clockBusy || !selfOnShift} className="border rounded px-2 py-1 disabled:opacity-60" onClick={() => { void manualClockOut(); }}>Clock Out</button>
 						</div>
 						{selectedEmployee && (
 							<div className="flex items-center gap-2">
