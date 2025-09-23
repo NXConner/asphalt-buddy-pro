@@ -735,7 +735,7 @@ export const UISettingsTab = () => {
                         <div>
                           <h4 className="font-medium">{wallpaper.name}</h4>
                           {wallpaper.isActive && (
-                            <Badge variant="default" className="text-xs mt-1">Active</Badge>
+                            <Badge className="text-xs mt-1">Active</Badge>
                           )}
                         </div>
                         <div className="flex gap-2">

@@ -59,7 +59,8 @@ export function applyThemeVariables(settings: UIThemeSettings) {
 
   // Apply wallpaper background image if provided
   try {
-    if (settings.backgroundImage) {
+    const isDark = document.documentElement.classList.contains('dark')
+    if (!isDark && settings.backgroundImage) {
       const url = settings.backgroundImage
       document.body.style.backgroundImage = `url("${url}")`
       document.body.style.backgroundSize = 'cover'
@@ -95,6 +96,15 @@ export function applyThemeMode(mode: ThemeMode) {
 	const isDark = mode === 'dark' || (mode === 'auto' && prefersDark)
 	root.classList.toggle('dark', isDark)
 	root.classList.toggle('light', !isDark)
+    try {
+        if (isDark) {
+            // Ensure pure black background in dark mode
+            document.body.style.backgroundImage = ''
+            document.body.style.backgroundColor = '#000000'
+        } else {
+            document.body.style.backgroundColor = ''
+        }
+    } catch {}
 }
 
 export function applyUITheme(settings: UIThemeSettings) {
