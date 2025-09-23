@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +54,26 @@ export const StencilCatalogTab = () => {
     curbStops: { quantity: 0, pricePer: 0, color: 'unpainted' },
     fireLane: { quantity: 0, pricePer: 0, color: 'red' }
   });
+
+  // Load cart from localStorage on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('stencilCart');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setCart(parsed);
+        }
+      }
+    } catch {}
+  }, []);
+
+  // Persist cart to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('stencilCart', JSON.stringify(cart));
+    } catch {}
+  }, [cart]);
 
   const handleSearch = (term: string) => {
     setSearchTerm(term);
@@ -796,10 +816,19 @@ export const StencilCatalogTab = () => {
       {(cart.length > 0 || getLineStripingTotal() > 0) && (
         <Card className="card-professional border-primary/20">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5" />
-              Quote Summary
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5" />
+                Quote Summary
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCart([])}
+              >
+                Clear Cart
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -809,6 +838,19 @@ export const StencilCatalogTab = () => {
                     <p className="font-medium">{item.stencil.name}</p>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                       <span>${item.stencil.price} x</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCart(prev => {
+                          const nextQty = item.quantity - 1;
+                          if (nextQty <= 0) {
+                            return prev.filter((_, i) => i !== index);
+                          }
+                          return prev.map((cartItem, i) => i === index ? { ...cartItem, quantity: nextQty } : cartItem);
+                        })}
+                      >
+                        -
+                      </Button>
                       <Input
                         type="number"
                         min={0}
@@ -824,6 +866,13 @@ export const StencilCatalogTab = () => {
                           });
                         }}
                       />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCart(prev => prev.map((cartItem, i) => i === index ? { ...cartItem, quantity: item.quantity + 1 } : cartItem))}
+                      >
+                        +
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
