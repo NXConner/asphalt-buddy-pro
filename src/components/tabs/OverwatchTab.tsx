@@ -60,6 +60,35 @@ const [alertsEnabled, setAlertsEnabled] = useState<boolean>(false);
 		stokesNC: { label: "Stokes County, NC", enabled: false, url: "", layers: "" },
 		surryNC: { label: "Surry County, NC", enabled: false, url: "", layers: "" },
 	});
+	// Persist and restore county WMS configuration
+	useEffect(() => {
+		try {
+			const raw = localStorage.getItem('overwatch.countyLayers');
+			if (raw) {
+				const saved = JSON.parse(raw);
+				setCountyLayers((prev) => ({
+					patrickVA: { ...prev.patrickVA, ...saved.patrickVA },
+					henryVA: { ...prev.henryVA, ...saved.henryVA },
+					stokesNC: { ...prev.stokesNC, ...saved.stokesNC },
+					surryNC: { ...prev.surryNC, ...saved.surryNC },
+				}));
+			}
+		} catch {
+			// ignore
+		}
+	}, []);
+
+	useEffect(() => {
+		try {
+			localStorage.setItem('overwatch.countyLayers', JSON.stringify(countyLayers));
+		} catch {
+			// ignore
+		}
+	}, [countyLayers]);
+
+	function isValidWms(url: string, layers: string) {
+		return /^https?:\/\//i.test(url) && layers.trim().length > 0;
+	}
 	const [detecting, setDetecting] = useState<boolean>(false);
 
 // Employee playback demo data and state
@@ -609,20 +638,19 @@ useEffect(() => {
                     <DrawingTools onChange={(polys) => setGeofenceRings(polys)} />
 
 					{/* County WMS Overlays */}
-					{countyLayers.patrickVA.enabled && countyLayers.patrickVA.url && countyLayers.patrickVA.layers && (
+					{countyLayers.patrickVA.enabled && isValidWms(countyLayers.patrickVA.url, countyLayers.patrickVA.layers) && (
 						<WMSTileLayer url={countyLayers.patrickVA.url} params={{ layers: countyLayers.patrickVA.layers, format: 'image/png', transparent: true }} opacity={0.7} />
 					)}
-					{countyLayers.henryVA.enabled && countyLayers.henryVA.url && countyLayers.henryVA.layers && (
+					{countyLayers.henryVA.enabled && isValidWms(countyLayers.henryVA.url, countyLayers.henryVA.layers) && (
 						<WMSTileLayer url={countyLayers.henryVA.url} params={{ layers: countyLayers.henryVA.layers, format: 'image/png', transparent: true }} opacity={0.7} />
 					)}
-					{countyLayers.stokesNC.enabled && countyLayers.stokesNC.url && countyLayers.stokesNC.layers && (
+					{countyLayers.stokesNC.enabled && isValidWms(countyLayers.stokesNC.url, countyLayers.stokesNC.layers) && (
 						<WMSTileLayer url={countyLayers.stokesNC.url} params={{ layers: countyLayers.stokesNC.layers, format: 'image/png', transparent: true }} opacity={0.7} />
 					)}
-					{countyLayers.surryNC.enabled && countyLayers.surryNC.url && countyLayers.surryNC.layers && (
+					{countyLayers.surryNC.enabled && isValidWms(countyLayers.surryNC.url, countyLayers.surryNC.layers) && (
 						<WMSTileLayer url={countyLayers.surryNC.url} params={{ layers: countyLayers.surryNC.layers, format: 'image/png', transparent: true }} opacity={0.7} />
 					)}
 
-					{/* TODO: County layers (Patrick, Henry VA; Stokes, Surry NC) via WMS placeholders */}
 				</MapContainer>
 			</div>
 
