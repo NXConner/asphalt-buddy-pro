@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, LayersControl, ScaleControl, ZoomControl, Mark
 import { fetchRainviewer, fetchForecast, computeRainEta, generateWeatherTips } from "@/lib/weather";
 import { supabase } from "@/integrations/supabase/client";
 import { searchAddress, GeocodeResult } from "@/lib/geocode";
+import { useToast } from "@/components/ui/use-toast";
 import area from "@turf/area";
 import distance from "@turf/distance";
 import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
@@ -15,7 +16,7 @@ import "leaflet-draw";
 type MapProvider = "osm" | "google" | "google_sat" | "esri" | "county";
 
 // Local helper to perform search with state handling
-async function performSearch(query: string, setSearching: (v: boolean) => void, setSearchError: (v: string | null) => void, setResults: (r: GeocodeResult[]) => void) {
+async function performSearch(query: string, setSearching: (v: boolean) => void, setSearchError: (v: string | null) => void, setResults: (r: GeocodeResult[]) => void, onError?: (msg: string) => void) {
     try {
         setSearchError(null);
         setSearching(true);
@@ -26,13 +27,16 @@ async function performSearch(query: string, setSearching: (v: boolean) => void, 
         }
     } catch (e: any) {
         setSearchError("Search failed. Please try again.");
+        onError?.(e?.message ? String(e.message) : "Search failed. Please try again.");
     } finally {
         setSearching(false);
     }
 }
 
 export function OverwatchTab() {
+    const { toast } = useToast();
 	const [provider, setProvider] = useState<MapProvider>("google_sat");
+    const [lastBaseProvider, setLastBaseProvider] = useState<Exclude<MapProvider, "county">>("google_sat");
 	const [hasGeolocation, setHasGeolocation] = useState<boolean>(false);
 	const [position, setPosition] = useState<GeolocationPosition | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -55,10 +59,10 @@ const [tips, setTips] = useState<string[]>([]);
 const [etaObj, setEtaObj] = useState<{ nextStart?: Date; nextStop?: Date; currentIntensityMmPerH?: number }>({});
 const [alertsEnabled, setAlertsEnabled] = useState<boolean>(false);
 	const [countyLayers, setCountyLayers] = useState({
-		patrickVA: { label: "Patrick County, VA", enabled: false, url: "", layers: "" },
-		henryVA: { label: "Henry County, VA", enabled: false, url: "", layers: "" },
-		stokesNC: { label: "Stokes County, NC", enabled: false, url: "", layers: "" },
-		surryNC: { label: "Surry County, NC", enabled: false, url: "", layers: "" },
+		patrickVA: { label: "Patrick County, VA", enabled: false, url: "", layers: "", version: "1.3.0", styles: "" },
+		henryVA: { label: "Henry County, VA", enabled: false, url: "", layers: "", version: "1.3.0", styles: "" },
+		stokesNC: { label: "Stokes County, NC", enabled: false, url: "", layers: "", version: "1.3.0", styles: "" },
+		surryNC: { label: "Surry County, NC", enabled: false, url: "", layers: "", version: "1.3.0", styles: "" },
 	});
 	// LayerGroup refs for syncing with LayersControl and external checkboxes
 	const patrickGroupRef = useRef<L.FeatureGroup | null>(null);
@@ -95,6 +99,13 @@ const [alertsEnabled, setAlertsEnabled] = useState<boolean>(false);
 		return /^https?:\/\//i.test(url) && layers.trim().length > 0;
 	}
 	const [detecting, setDetecting] = useState<boolean>(false);
+
+	// Track last non-county basemap for county fallback
+	useEffect(() => {
+		if (provider !== "county") {
+			setLastBaseProvider(provider as Exclude<MapProvider, "county">);
+		}
+	}, [provider]);
 
 	// Sync map overlay checkbox interactions back to local state
 	useEffect(() => {
@@ -341,17 +352,13 @@ useEffect(() => {
 		return { lat: position.coords.latitude, lng: position.coords.longitude, acc: position.coords.accuracy };
 	}, [position]);
 
-	function MapFlyTo({ lat, lon }: { lat: number; lon: number }) {
-		const map = useMap();
-		useEffect(() => {
-			map.flyTo([lat, lon], 16, { duration: 0.6 });
-		}, [lat, lon]);
-		return null;
-	}
+	// removed unused MapFlyTo helper
 
 	async function handleSearch() {
 		if (query.trim().length < 3) return;
-		await performSearch(query, setSearching, setSearchError, setResults);
+		await performSearch(query, setSearching, setSearchError, setResults, (msg) => {
+			toast({ title: "Geocoding failed", description: msg, variant: "destructive" });
+		});
 	}
 
 	// Fit to selected geocode result when chosen
@@ -518,7 +525,7 @@ useEffect(() => {
 				(map as any).fire((L as any).Draw.Event.CREATED, { layer: poly });
 			}
 		} catch (e) {
-			// no-op
+			toast({ title: "AI Detect failed", description: "Overpass request failed. Try zooming in further or retry.", variant: "destructive" });
 		} finally {
 			setDetecting(false);
 		}
@@ -645,22 +652,30 @@ useEffect(() => {
 					style={{ width: "100%", height: "100%" }}
 					zoomControl={false}
 				>
-					<MapInstanceSetter onMap={setMap} />
+				<MapInstanceSetter onMap={setMap} />
 					<ZoomControl position="topright" />
 					<ScaleControl position="bottomleft" />
-					<LayersControl position="topright">
+					{(() => {
+						const effectiveBase = provider === "county" ? lastBaseProvider : provider;
+						const controlKey = `${effectiveBase}|${countyLayers.patrickVA.enabled ? 1 : 0}${countyLayers.henryVA.enabled ? 1 : 0}${countyLayers.stokesNC.enabled ? 1 : 0}${countyLayers.surryNC.enabled ? 1 : 0}`;
+						return (
+							<LayersControl position="topright" key={controlKey}>
 						<LayersControl.BaseLayer checked={provider === "osm"} name="OpenStreetMap">
 							<TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap" />
 						</LayersControl.BaseLayer>
 						<LayersControl.BaseLayer checked={provider === "google"} name="Google Maps">
 							<TileLayer url="https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}" subdomains={["mt0","mt1","mt2","mt3"]} />
 						</LayersControl.BaseLayer>
-					<LayersControl.BaseLayer checked={provider === "google_sat"} name="Google Satellite (Hybrid)">
+						<LayersControl.BaseLayer checked={provider === "google_sat"} name="Google Satellite (Hybrid)">
 						<TileLayer url="https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}" subdomains={["mt0","mt1","mt2","mt3"]} />
 					</LayersControl.BaseLayer>
 						<LayersControl.BaseLayer checked={provider === "esri"} name="ESRI Imagery">
 							<TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" attribution="Tiles &copy; Esri" />
 						</LayersControl.BaseLayer>
+							{/* County mode uses last non-county basemap as fallback */}
+						</LayersControl>
+						);
+					})()}
 						{radarFrames.length > 0 && (
 							<LayersControl.Overlay checked name="Radar (RainViewer)">
 								<TileLayer url={radarFrames[radarIdx % radarFrames.length]} opacity={0.6} />
@@ -669,33 +684,33 @@ useEffect(() => {
 						{/* County WMS Overlays in LayersControl */}
 						<LayersControl.Overlay name="Patrick County, VA" checked={countyLayers.patrickVA.enabled}>
 							<FeatureGroup ref={patrickGroupRef as any}>
-								{isValidWms(countyLayers.patrickVA.url, countyLayers.patrickVA.layers) && (
-									<WMSTileLayer url={countyLayers.patrickVA.url} params={{ layers: countyLayers.patrickVA.layers, format: 'image/png', transparent: true }} opacity={0.7} />
-								)}
+						{isValidWms(countyLayers.patrickVA.url, countyLayers.patrickVA.layers) && (
+							<WMSTileLayer url={countyLayers.patrickVA.url} params={{ layers: countyLayers.patrickVA.layers, format: 'image/png', transparent: true, version: countyLayers.patrickVA.version || undefined, styles: countyLayers.patrickVA.styles || undefined }} opacity={0.7} />
+						)}
 							</FeatureGroup>
 						</LayersControl.Overlay>
 						<LayersControl.Overlay name="Henry County, VA" checked={countyLayers.henryVA.enabled}>
 							<FeatureGroup ref={henryGroupRef as any}>
-								{isValidWms(countyLayers.henryVA.url, countyLayers.henryVA.layers) && (
-									<WMSTileLayer url={countyLayers.henryVA.url} params={{ layers: countyLayers.henryVA.layers, format: 'image/png', transparent: true }} opacity={0.7} />
-								)}
+							{isValidWms(countyLayers.henryVA.url, countyLayers.henryVA.layers) && (
+								<WMSTileLayer url={countyLayers.henryVA.url} params={{ layers: countyLayers.henryVA.layers, format: 'image/png', transparent: true, version: countyLayers.henryVA.version || undefined, styles: countyLayers.henryVA.styles || undefined }} opacity={0.7} />
+							)}
 							</FeatureGroup>
 						</LayersControl.Overlay>
 						<LayersControl.Overlay name="Stokes County, NC" checked={countyLayers.stokesNC.enabled}>
 							<FeatureGroup ref={stokesGroupRef as any}>
-								{isValidWms(countyLayers.stokesNC.url, countyLayers.stokesNC.layers) && (
-									<WMSTileLayer url={countyLayers.stokesNC.url} params={{ layers: countyLayers.stokesNC.layers, format: 'image/png', transparent: true }} opacity={0.7} />
-								)}
+							{isValidWms(countyLayers.stokesNC.url, countyLayers.stokesNC.layers) && (
+								<WMSTileLayer url={countyLayers.stokesNC.url} params={{ layers: countyLayers.stokesNC.layers, format: 'image/png', transparent: true, version: countyLayers.stokesNC.version || undefined, styles: countyLayers.stokesNC.styles || undefined }} opacity={0.7} />
+							)}
 							</FeatureGroup>
 						</LayersControl.Overlay>
 						<LayersControl.Overlay name="Surry County, NC" checked={countyLayers.surryNC.enabled}>
 							<FeatureGroup ref={surryGroupRef as any}>
-								{isValidWms(countyLayers.surryNC.url, countyLayers.surryNC.layers) && (
-									<WMSTileLayer url={countyLayers.surryNC.url} params={{ layers: countyLayers.surryNC.layers, format: 'image/png', transparent: true }} opacity={0.7} />
-								)}
+							{isValidWms(countyLayers.surryNC.url, countyLayers.surryNC.layers) && (
+								<WMSTileLayer url={countyLayers.surryNC.url} params={{ layers: countyLayers.surryNC.layers, format: 'image/png', transparent: true, version: countyLayers.surryNC.version || undefined, styles: countyLayers.surryNC.styles || undefined }} opacity={0.7} />
+							)}
 							</FeatureGroup>
 						</LayersControl.Overlay>
-					</LayersControl>
+				{/* end dynamic LayersControl */}
 
 					{coords && (
 						<Marker position={[coords.lat, coords.lng]}>
@@ -859,12 +874,20 @@ useEffect(() => {
 				<div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
 					<input className="border rounded px-2 py-1 text-sm" placeholder="Patrick WMS URL" value={countyLayers.patrickVA.url} onChange={(e) => setCountyLayers(s => ({...s, patrickVA: {...s.patrickVA, url: e.target.value}}))} />
 					<input className="border rounded px-2 py-1 text-sm" placeholder="Patrick WMS Layers" value={countyLayers.patrickVA.layers} onChange={(e) => setCountyLayers(s => ({...s, patrickVA: {...s.patrickVA, layers: e.target.value}}))} />
+					<input className="border rounded px-2 py-1 text-sm" placeholder="Patrick WMS Version (e.g. 1.3.0)" value={countyLayers.patrickVA.version} onChange={(e) => setCountyLayers(s => ({...s, patrickVA: {...s.patrickVA, version: e.target.value}}))} />
+					<input className="border rounded px-2 py-1 text-sm" placeholder="Patrick WMS Styles (optional)" value={countyLayers.patrickVA.styles} onChange={(e) => setCountyLayers(s => ({...s, patrickVA: {...s.patrickVA, styles: e.target.value}}))} />
 					<input className="border rounded px-2 py-1 text-sm" placeholder="Henry WMS URL" value={countyLayers.henryVA.url} onChange={(e) => setCountyLayers(s => ({...s, henryVA: {...s.henryVA, url: e.target.value}}))} />
 					<input className="border rounded px-2 py-1 text-sm" placeholder="Henry WMS Layers" value={countyLayers.henryVA.layers} onChange={(e) => setCountyLayers(s => ({...s, henryVA: {...s.henryVA, layers: e.target.value}}))} />
+					<input className="border rounded px-2 py-1 text-sm" placeholder="Henry WMS Version (e.g. 1.3.0)" value={countyLayers.henryVA.version} onChange={(e) => setCountyLayers(s => ({...s, henryVA: {...s.henryVA, version: e.target.value}}))} />
+					<input className="border rounded px-2 py-1 text-sm" placeholder="Henry WMS Styles (optional)" value={countyLayers.henryVA.styles} onChange={(e) => setCountyLayers(s => ({...s, henryVA: {...s.henryVA, styles: e.target.value}}))} />
 					<input className="border rounded px-2 py-1 text-sm" placeholder="Stokes WMS URL" value={countyLayers.stokesNC.url} onChange={(e) => setCountyLayers(s => ({...s, stokesNC: {...s.stokesNC, url: e.target.value}}))} />
 					<input className="border rounded px-2 py-1 text-sm" placeholder="Stokes WMS Layers" value={countyLayers.stokesNC.layers} onChange={(e) => setCountyLayers(s => ({...s, stokesNC: {...s.stokesNC, layers: e.target.value}}))} />
+					<input className="border rounded px-2 py-1 text-sm" placeholder="Stokes WMS Version (e.g. 1.3.0)" value={countyLayers.stokesNC.version} onChange={(e) => setCountyLayers(s => ({...s, stokesNC: {...s.stokesNC, version: e.target.value}}))} />
+					<input className="border rounded px-2 py-1 text-sm" placeholder="Stokes WMS Styles (optional)" value={countyLayers.stokesNC.styles} onChange={(e) => setCountyLayers(s => ({...s, stokesNC: {...s.stokesNC, styles: e.target.value}}))} />
 					<input className="border rounded px-2 py-1 text-sm" placeholder="Surry WMS URL" value={countyLayers.surryNC.url} onChange={(e) => setCountyLayers(s => ({...s, surryNC: {...s.surryNC, url: e.target.value}}))} />
 					<input className="border rounded px-2 py-1 text-sm" placeholder="Surry WMS Layers" value={countyLayers.surryNC.layers} onChange={(e) => setCountyLayers(s => ({...s, surryNC: {...s.surryNC, layers: e.target.value}}))} />
+					<input className="border rounded px-2 py-1 text-sm" placeholder="Surry WMS Version (e.g. 1.3.0)" value={countyLayers.surryNC.version} onChange={(e) => setCountyLayers(s => ({...s, surryNC: {...s.surryNC, version: e.target.value}}))} />
+					<input className="border rounded px-2 py-1 text-sm" placeholder="Surry WMS Styles (optional)" value={countyLayers.surryNC.styles} onChange={(e) => setCountyLayers(s => ({...s, surryNC: {...s.surryNC, styles: e.target.value}}))} />
 				</div>
 			</div>
 
