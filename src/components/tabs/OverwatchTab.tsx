@@ -15,7 +15,7 @@ import "leaflet-draw";
 type MapProvider = "osm" | "google" | "google_sat" | "esri" | "county";
 
 export function OverwatchTab() {
-	const [provider, setProvider] = useState<MapProvider>("osm");
+	const [provider, setProvider] = useState<MapProvider>("google_sat");
 	const [hasGeolocation, setHasGeolocation] = useState<boolean>(false);
 	const [position, setPosition] = useState<GeolocationPosition | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -41,6 +41,7 @@ const [alertsEnabled, setAlertsEnabled] = useState<boolean>(false);
 		stokesNC: { label: "Stokes County, NC", enabled: false, url: "", layers: "" },
 		surryNC: { label: "Surry County, NC", enabled: false, url: "", layers: "" },
 	});
+	const [detecting, setDetecting] = useState<boolean>(false);
 
 // Employee playback demo data and state
 type EmployeePathPoint = { lat: number; lng: number; t: number };
@@ -275,7 +276,7 @@ useEffect(() => {
 				featureGroupRef.current?.eachLayer((layer: any) => {
 					if (layer.getLatLngs) {
 						const latlngs = layer.getLatLngs();
-                        const ring: [number, number][] = (latlngs[0] as L.LatLng[]).map((ll: L.LatLng) => [ll.lng, ll.lat]);
+						const ring: [number, number][] = (latlngs[0] as L.LatLng[]).map((ll: L.LatLng) => [ll.lng, ll.lat]);
 						if (ring.length > 2) {
                             const poly = polygon([[...ring, ring[0]]]);
                             const aSqM = area(poly);
@@ -321,21 +322,74 @@ useEffect(() => {
         return null;
 	}
 
-	function aiDetect() {
-		if (!map) return;
-		const center = map.getCenter();
-		function offset(lat: number, lng: number, dNorthM: number, dEastM: number) {
-			const dLat = dNorthM / 111320;
-			const dLng = dEastM / (111320 * Math.cos(lat * Math.PI / 180));
-			return L.latLng(lat + dLat, lng + dLng);
+	async function aiDetect() {
+		if (!map || detecting) return;
+		try {
+			setDetecting(true);
+			const b = map.getBounds();
+			const south = b.getSouth();
+			const west = b.getWest();
+			const north = b.getNorth();
+			const east = b.getEast();
+			const query = `
+				[out:json][timeout:25];
+				(
+					way["surface"~"^(asphalt|paved)$"]["area"="yes"](${south},${west},${north},${east});
+					way["amenity"="parking"](${south},${west},${north},${east});
+					relation["amenity"="parking"](${south},${west},${north},${east});
+					way["landuse"~"^(retail|industrial|commercial)$"]["surface"~"^(asphalt|paved)$"](${south},${west},${north},${east});
+					relation["landuse"~"^(retail|industrial|commercial)$"]["surface"~"^(asphalt|paved)$"](${south},${west},${north},${east});
+				);
+				out body geom;`;
+			const res = await fetch("https://overpass-api.de/api/interpreter", {
+				method: "POST",
+				headers: { "Content-Type": "text/plain" },
+				body: query
+			});
+			if (!res.ok) throw new Error("Overpass query failed");
+			const data = await res.json();
+			const elements: any[] = data?.elements || [];
+			let count = 0;
+			for (const el of elements) {
+				if (el.type === "way" && Array.isArray(el.geometry) && el.geometry.length >= 3) {
+					const latlngs = el.geometry.map((g: any) => L.latLng(g.lat, g.lon));
+					const poly = L.polygon(latlngs, { color: "#f59e0b", weight: 2, fillColor: "#f59e0b", fillOpacity: 0.25 });
+					poly.addTo(map);
+					(map as any).fire((L as any).Draw.Event.CREATED, { layer: poly });
+					count++;
+				} else if (el.type === "relation" && Array.isArray(el.members)) {
+					for (const m of el.members) {
+						if (m.role === "outer" && Array.isArray(m.geometry) && m.geometry.length >= 3) {
+							const latlngs = m.geometry.map((g: any) => L.latLng(g.lat, g.lon));
+							const poly = L.polygon(latlngs, { color: "#f59e0b", weight: 2, fillColor: "#f59e0b", fillOpacity: 0.25 });
+							poly.addTo(map);
+							(map as any).fire((L as any).Draw.Event.CREATED, { layer: poly });
+							count++;
+						}
+					}
+				}
+			}
+			if (count === 0) {
+				// Fallback: create a small rectangle near center as a hint
+				const center = map.getCenter();
+				function offset(lat: number, lng: number, dNorthM: number, dEastM: number) {
+					const dLat = dNorthM / 111320;
+					const dLng = dEastM / (111320 * Math.cos(lat * Math.PI / 180));
+					return L.latLng(lat + dLat, lng + dLng);
+				}
+				const a = offset(center.lat, center.lng, 25, -35);
+				const d = offset(center.lat, center.lng, -25, -35);
+				const c = offset(center.lat, center.lng, -25, 35);
+				const b = offset(center.lat, center.lng, 25, 35);
+				const poly = L.polygon([a, b, c, d], { color: "#f59e0b", weight: 2, fillColor: "#f59e0b", fillOpacity: 0.25 });
+				poly.addTo(map);
+				(map as any).fire((L as any).Draw.Event.CREATED, { layer: poly });
+			}
+		} catch (e) {
+			// no-op
+		} finally {
+			setDetecting(false);
 		}
-		const a = offset(center.lat, center.lng, 20, -30);
-		const b = offset(center.lat, center.lng, 20, 30);
-		const c = offset(center.lat, center.lng, -20, 30);
-		const d = offset(center.lat, center.lng, -20, -30);
-		const poly = L.polygon([a, b, c, d], { color: "#f59e0b", weight: 2, fillColor: "#f59e0b", fillOpacity: 0.25 });
-		poly.addTo(map);
-		(map as any).fire((L as any).Draw.Event.CREATED, { layer: poly });
 	}
 
 	function MapInstanceSetter({ onMap }: { onMap: (m: L.Map) => void }) {
@@ -421,9 +475,9 @@ useEffect(() => {
 						<LayersControl.BaseLayer checked={provider === "google"} name="Google Maps">
 							<TileLayer url="https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}" subdomains={["mt0","mt1","mt2","mt3"]} />
 						</LayersControl.BaseLayer>
-						<LayersControl.BaseLayer checked={provider === "google_sat"} name="Google Satellite">
-							<TileLayer url="https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}" subdomains={["mt0","mt1","mt2","mt3"]} />
-						</LayersControl.BaseLayer>
+					<LayersControl.BaseLayer checked={provider === "google_sat"} name="Google Satellite (Hybrid)">
+						<TileLayer url="https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}" subdomains={["mt0","mt1","mt2","mt3"]} />
+					</LayersControl.BaseLayer>
 						<LayersControl.BaseLayer checked={provider === "esri"} name="ESRI Imagery">
 							<TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" attribution="Tiles &copy; Esri" />
 						</LayersControl.BaseLayer>
@@ -562,7 +616,7 @@ useEffect(() => {
 						<li>Work-hours device usage monitoring</li>
 					</ul>
 					<div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <button className="border rounded px-3 py-2 active:scale-95 transition-transform" onClick={aiDetect}>AI Detect Asphalt (preview)</button>
+						<button className="border rounded px-3 py-2 active:scale-95 transition-transform" onClick={aiDetect} disabled={detecting}>{detecting ? "Detecting…" : "AI Detect Asphalt"}</button>
 						<div className="flex items-center gap-2">
 							<label className="text-sm">Employee playback</label>
 							<select className="border rounded px-2 py-1" value={selectedEmployeeId ?? ""} onChange={(e) => { setSelectedEmployeeId(e.target.value || null); setPlaybackIdx(0); }}>
