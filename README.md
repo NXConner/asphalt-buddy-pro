@@ -1,3 +1,29 @@
+## Monorepo
+
+This repository is a Turborepo-powered monorepo managed with pnpm workspaces.
+
+### Structure
+- `apps/` — application projects (`web`, `api`)
+- `packages/` — shared libraries (`ui`, `types`, `tsconfig`, `eslint-config`)
+
+### Commands
+- `pnpm dev` — run all app dev servers
+- `pnpm build` — build all projects
+- `pnpm test` — run all tests
+- `pnpm lint` — run linters
+
+### Prerequisites
+- Node 20+
+- pnpm 9+
+
+### Getting started
+1. Copy `.env.example` to `.env` and adjust as needed
+2. Start infra: `docker compose up -d`
+3. Install deps: `pnpm i`
+4. Generate Prisma client: `pnpm -w --filter @acme/db prisma:generate`
+5. Run dev: `pnpm dev`
+
+
 # Welcome to your Lovable project
 
 ## Project info

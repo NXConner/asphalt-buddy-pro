@@ -1,0 +1,12 @@
+{
+  "extends": "@acme/tsconfig/react.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@acme/ui": ["../../packages/ui/src"],
+      "@acme/types": ["../../packages/types/src"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules"]
+}
