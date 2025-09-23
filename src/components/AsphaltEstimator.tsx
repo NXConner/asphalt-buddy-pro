@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useRef, useState, lazy } from "react";
-import { Calculator, Settings, Users, FileText, DollarSign, FolderOpen, Palette, User, BookOpen, Sparkles } from "lucide-react";
+import { Calculator, Settings, Users, FileText, DollarSign, FolderOpen, Palette, User, BookOpen, Sparkles, Shield } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { EstimatorTab } from "./tabs/EstimatorTab";
@@ -12,6 +12,7 @@ import { DocumentsTab } from "./tabs/DocumentsTab";
 import { StencilCatalogTab } from "./tabs/StencilCatalogTab";
 import { PremiumServicesTab } from "./tabs/PremiumServicesTab";
 import { BestPracticesTab } from "./tabs/BestPracticesTab";
+import { ComplianceTab } from "./tabs/ComplianceTab";
 import { ProfileTab } from "./tabs/ProfileTab";
 import { UISettingsTab } from "./tabs/UISettingsTab";
 import { DraggableCalculator } from "./tabs/DraggableCalculator";
@@ -55,6 +56,7 @@ const AsphaltEstimator = () => {
     { id: "stencils", label: "Stencil Catalog", icon: Palette },
     { id: "premium", label: "Premium Services", icon: Sparkles },
     { id: "practices", label: "Best Practices", icon: BookOpen },
+    { id: "compliance", label: "Compliance", icon: Shield },
     { id: "profile", label: "Profile", icon: User },
     { id: "ui", label: "UI Settings", icon: Settings },
   ];
@@ -156,6 +158,10 @@ const AsphaltEstimator = () => {
 
           <TabsContent value="practices" className="space-y-6">
             <BestPracticesTab />
+          </TabsContent>
+
+          <TabsContent value="compliance" className="space-y-6">
+            <ComplianceTab />
           </TabsContent>
 
           <TabsContent value="profile" className="space-y-6">
