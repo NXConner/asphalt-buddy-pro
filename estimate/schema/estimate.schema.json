@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/estimate.schema.json",
+  "title": "Building Estimate",
+  "type": "object",
+  "required": ["meta", "scope", "costs"],
+  "additionalProperties": false,
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["id", "name", "currencyCode", "createdAt", "revision"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "client": { "type": "string" },
+        "currencyCode": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "exchangeRateToBase": { "type": "number", "minimum": 0 },
+        "baseCurrencyCode": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "revision": { "type": "string" },
+        "validThrough": { "type": "string", "format": "date" },
+        "assumptions": { "type": "array", "items": { "type": "string" } },
+        "exclusions": { "type": "array", "items": { "type": "string" } },
+        "wbsCode": { "type": "string" }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "required": ["site", "designMaturity", "schedule"],
+      "additionalProperties": false,
+      "properties": {
+        "site": {
+          "type": "object",
+          "required": ["location", "access", "workHours"],
+          "additionalProperties": false,
+          "properties": {
+            "location": { "type": "string" },
+            "access": { "type": "string" },
+            "workHours": { "type": "string" },
+            "utilitiesAvailable": { "type": "boolean" },
+            "constraints": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "designMaturity": { "type": "string", "enum": ["concept", "schematic", "design development", "construction documents"] },
+        "schedule": {
+          "type": "object",
+          "required": ["durationMonths", "weatherDowntimePct"],
+          "additionalProperties": false,
+          "properties": {
+            "durationMonths": { "type": "number", "minimum": 0 },
+            "weatherDowntimePct": { "type": "number", "minimum": 0, "maximum": 1 },
+            "accessWindows": { "type": "string" }
+          }
+        },
+        "clientProvidedItems": { "type": "array", "items": { "type": "string" } },
+        "alternates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "name"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "impact": { "type": "string" },
+              "amount": { "type": "number", "minimum": 0 },
+              "includeInTotal": { "type": "boolean" }
+            }
+          }
+        },
+        "allowances": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "name", "amount"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "amount": { "type": "number", "minimum": 0 },
+              "includeInTotal": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    "costs": {
+      "type": "object",
+      "required": [
+        "labor",
+        "materials",
+        "equipment",
+        "subcontractors",
+        "permitsAndFees",
+        "risk",
+        "overheadAndProfit",
+        "taxes",
+        "commercial",
+        "escalation"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "labor": {
+          "type": "object",
+          "required": ["baseLaborHours", "productivityFactor", "laborRate", "overtimeMultiplier", "laborBurdenPct"],
+          "additionalProperties": false,
+          "properties": {
+            "baseLaborHours": { "type": "number", "minimum": 0 },
+            "productivityFactor": { "type": "number", "exclusiveMinimum": 0 },
+            "laborRate": { "type": "number", "minimum": 0 },
+            "laborBurdenPct": { "type": "number", "minimum": 0, "maximum": 1 },
+            "overtimeMultiplier": { "type": "number", "minimum": 1 },
+            "notes": { "type": "string" }
+          }
+        },
+        "materials": {
+          "type": "object",
+          "required": ["items", "freightCost", "dutiesTaxesPct"],
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "description", "units", "unitCost", "wasteFactor"],
+                "additionalProperties": false,
+                "properties": {
+                  "id": { "type": "string" },
+                  "description": { "type": "string" },
+                  "quantity": { "type": "number", "minimum": 0 },
+                  "units": { "type": "string" },
+                  "unitCost": { "type": "number", "minimum": 0 },
+                  "wasteFactor": { "type": "number", "minimum": 0 },
+                  "source": { "type": "string" },
+                  "wbsCode": { "type": "string" }
+                }
+              }
+            },
+            "freightCost": { "type": "number", "minimum": 0 },
+            "dutiesTaxesPct": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "equipment": {
+          "type": "object",
+          "required": ["items", "fuelPct", "mobilizationLumpSum"],
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "description", "hours", "rate"],
+                "additionalProperties": false,
+                "properties": {
+                  "id": { "type": "string" },
+                  "description": { "type": "string" },
+                  "hours": { "type": "number", "minimum": 0 },
+                  "rate": { "type": "number", "minimum": 0 },
+                  "wbsCode": { "type": "string" }
+                }
+              }
+            },
+            "fuelPct": { "type": "number", "minimum": 0 },
+            "mobilizationLumpSum": { "type": "number", "minimum": 0 }
+          }
+        },
+        "subcontractors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "name", "quote", "scope"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "quote": { "type": "number", "minimum": 0 },
+              "scope": { "type": "string" },
+              "validThrough": { "type": "string", "format": "date" },
+              "exclusions": { "type": "array", "items": { "type": "string" } },
+              "wbsCode": { "type": "string" }
+            }
+          }
+        },
+        "permitsAndFees": {
+          "type": "object",
+          "required": ["permitFees", "testingInspectionCosts", "disposalFees"],
+          "additionalProperties": false,
+          "properties": {
+            "permitFees": { "type": "number", "minimum": 0 },
+            "testingInspectionCosts": { "type": "number", "minimum": 0 },
+            "disposalFees": { "type": "number", "minimum": 0 }
+          }
+        },
+        "risk": {
+          "type": "object",
+          "required": ["contingencyPct", "insurancePct", "bondPct"],
+          "additionalProperties": false,
+          "properties": {
+            "contingencyPct": { "type": "number", "minimum": 0, "maximum": 1 },
+            "insurancePct": { "type": "number", "minimum": 0, "maximum": 1 },
+            "bondPct": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "overheadAndProfit": {
+          "type": "object",
+          "required": ["overheadPct", "profitPct"],
+          "additionalProperties": false,
+          "properties": {
+            "overheadPct": { "type": "number", "minimum": 0, "maximum": 1 },
+            "profitPct": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "taxes": {
+          "type": "object",
+          "required": ["salesTaxPct"],
+          "additionalProperties": false,
+          "properties": {
+            "salesTaxPct": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "commercial": {
+          "type": "object",
+          "required": ["paymentTerms", "retentionPct"],
+          "additionalProperties": false,
+          "properties": {
+            "paymentTerms": { "type": "string" },
+            "retentionPct": { "type": "number", "minimum": 0, "maximum": 1 },
+            "bondRequired": { "type": "boolean" }
+          }
+        },
+        "escalation": {
+          "type": "object",
+          "required": ["escalationPctPerYear"],
+          "additionalProperties": false,
+          "properties": {
+            "escalationPctPerYear": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        }
+      }
+    }
+  }
+}
