@@ -709,8 +709,8 @@ export const StencilCatalogTab = () => {
             </div>
             <div className="md:col-span-2">
               <Label>Paint Color</Label>
-              <Select value={lineStriping.fireLane.color} onValueChange={() => {}}>
-                <SelectTrigger className="w-full md:w-64">
+              <Select value={lineStriping.fireLane.color} disabled>
+                <SelectTrigger className="w-full md:w-64" disabled>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -807,9 +807,31 @@ export const StencilCatalogTab = () => {
                 <div key={`cart-${index}`} className="flex justify-between items-center py-2 border-b border-border/50">
                   <div>
                     <p className="font-medium">{item.stencil.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      ${item.stencil.price} x {item.quantity}
-                    </p>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                      <span>${item.stencil.price} x</span>
+                      <Input
+                        type="number"
+                        min={0}
+                        className="w-16 h-8"
+                        value={item.quantity}
+                        onChange={(e) => {
+                          const nextQty = parseInt(e.target.value) || 0;
+                          setCart(prev => {
+                            if (nextQty <= 0) {
+                              return prev.filter((_, i) => i !== index);
+                            }
+                            return prev.map((cartItem, i) => i === index ? { ...cartItem, quantity: nextQty } : cartItem);
+                          });
+                        }}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setCart(prev => prev.filter((_, i) => i !== index))}
+                      >
+                        Remove
+                      </Button>
+                    </div>
                   </div>
                   <p className="font-semibold">${(item.stencil.price * item.quantity).toFixed(2)}</p>
                 </div>
