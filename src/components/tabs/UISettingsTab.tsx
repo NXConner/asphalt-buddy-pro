@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { applyUITheme, broadcastThemeUpdated } from "@/lib/theme";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -154,8 +155,18 @@ export const UISettingsTab = () => {
     }
   }, []);
 
+  // Live preview theme changes when in preview mode
+  useEffect(() => {
+    if (isPreviewMode) {
+      applyUITheme(settings.theme as any);
+    }
+  }, [isPreviewMode, settings]);
+
   const saveSettings = () => {
     localStorage.setItem('uiSettings', JSON.stringify(settings));
+    // Apply immediately and notify app
+    applyUITheme(settings.theme as any);
+    broadcastThemeUpdated(settings.theme as any);
     toast({
       title: "Settings saved!",
       description: "Your UI preferences have been updated successfully."
@@ -170,6 +181,9 @@ export const UISettingsTab = () => {
         accentColor: theme.primary
       }
     }));
+    if (isPreviewMode) {
+      applyUITheme({ ...settings.theme, accentColor: theme.primary } as any);
+    }
   };
 
   const handleSoundUpload = () => {
@@ -264,10 +278,21 @@ export const UISettingsTab = () => {
   };
 
   const previewTheme = () => {
-    setIsPreviewMode(!isPreviewMode);
+    const next = !isPreviewMode;
+    setIsPreviewMode(next);
+    if (next) {
+      applyUITheme(settings.theme as any);
+    } else {
+      // Exit preview: re-apply persisted theme if different
+      try {
+        const saved = localStorage.getItem('uiSettings');
+        const parsed = saved ? JSON.parse(saved) : null;
+        if (parsed?.theme) applyUITheme(parsed.theme);
+      } catch {}
+    }
     toast({
-      title: isPreviewMode ? "Preview disabled" : "Preview enabled",
-      description: isPreviewMode ? "Returned to normal view" : "Showing theme preview"
+      title: next ? "Preview enabled" : "Preview disabled",
+      description: next ? "Showing theme preview" : "Returned to normal view"
     });
   };
 
