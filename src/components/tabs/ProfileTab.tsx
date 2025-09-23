@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { User, Upload, Camera, Mail, Phone, MapPin, Building, Calendar, Save, Edit } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface UserProfile {
   personal: {
@@ -57,6 +58,8 @@ interface UserProfile {
 
 export const ProfileTab = () => {
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [profile, setProfile] = useState<UserProfile>({
     personal: {
       firstName: "John",
@@ -123,11 +126,55 @@ export const ProfileTab = () => {
   };
 
   const handleAvatarUpload = () => {
-    // Mock avatar upload functionality
-    toast({
-      title: "Avatar upload",
-      description: "Avatar upload functionality would be implemented here with file handling."
-    });
+    try {
+      fileInputRef.current?.click();
+    } catch {}
+  };
+
+  const onAvatarFileSelected = async (e: any) => {
+    try {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (!file.type.startsWith("image/")) {
+        toast({ title: "Invalid file", description: "Please select an image file.", variant: "destructive" });
+        return;
+      }
+      const maxBytes = 5 * 1024 * 1024;
+      if (file.size > maxBytes) {
+        toast({ title: "File too large", description: "Max size is 5 MB.", variant: "destructive" });
+        return;
+      }
+      setUploading(true);
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      if (userErr || !userData.user) {
+        toast({ title: "Not signed in", description: "Please sign in to upload an avatar.", variant: "destructive" });
+        return;
+      }
+      const userId = userData.user.id;
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `${userId}/avatar-${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from("logos").upload(path, file, { upsert: true, contentType: file.type, cacheControl: "3600" });
+      if (uploadErr) {
+        toast({ title: "Upload failed", description: uploadErr.message, variant: "destructive" });
+        return;
+      }
+      const { data: pub } = supabase.storage.from("logos").getPublicUrl(path);
+      const publicUrl = pub.publicUrl;
+      const next = {
+        ...profile,
+        personal: { ...profile.personal, avatar: publicUrl }
+      } as UserProfile;
+      setProfile(next);
+      try {
+        localStorage.setItem('userProfile', JSON.stringify(next));
+      } catch {}
+      toast({ title: "Avatar updated", description: "Your profile photo has been updated." });
+    } catch (err: any) {
+      toast({ title: "Upload error", description: err?.message ? String(err.message) : "Something went wrong.", variant: "destructive" });
+    } finally {
+      setUploading(false);
+      try { if (fileInputRef.current) fileInputRef.current.value = ""; } catch {}
+    }
   };
 
   const getBadgeColor = (badge: string) => {
@@ -152,11 +199,19 @@ export const ProfileTab = () => {
                   {getInitials(profile.personal.firstName, profile.personal.lastName)}
                 </AvatarFallback>
               </Avatar>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={onAvatarFileSelected}
+              />
               <Button
                 size="sm"
                 variant="outline"
                 className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0"
                 onClick={handleAvatarUpload}
+                disabled={uploading}
               >
                 <Camera className="h-4 w-4" />
               </Button>
