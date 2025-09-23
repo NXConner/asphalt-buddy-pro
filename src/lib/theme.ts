@@ -17,6 +17,7 @@ export interface UIThemeSettings {
 	reducedMotion: boolean
 	fontSize: 'small' | 'medium' | 'large'
 	borderRadius: 'none' | 'small' | 'medium' | 'large'
+  backgroundImage?: string
 }
 
 const RADIUS_MAP: Record<NonNullable<UIThemeSettings['borderRadius']>, string> = {
@@ -56,6 +57,20 @@ export function applyThemeVariables(settings: UIThemeSettings) {
 		root.style.setProperty('--bg-opacity', `${settings.backgroundOpacity}`)
 	}
 
+  // Apply wallpaper background image if provided
+  try {
+    const isDark = document.documentElement.classList.contains('dark')
+    if (!isDark && settings.backgroundImage) {
+      const url = settings.backgroundImage
+      document.body.style.backgroundImage = `url("${url}")`
+      document.body.style.backgroundSize = 'cover'
+      document.body.style.backgroundPosition = 'center'
+      document.body.style.backgroundAttachment = 'fixed'
+    } else {
+      document.body.style.backgroundImage = ''
+    }
+  } catch {}
+
 	// Border radius
 	if (settings.borderRadius) {
 		root.style.setProperty('--radius', RADIUS_MAP[settings.borderRadius])
@@ -81,6 +96,15 @@ export function applyThemeMode(mode: ThemeMode) {
 	const isDark = mode === 'dark' || (mode === 'auto' && prefersDark)
 	root.classList.toggle('dark', isDark)
 	root.classList.toggle('light', !isDark)
+    try {
+        if (isDark) {
+            // Ensure pure black background in dark mode
+            document.body.style.backgroundImage = ''
+            document.body.style.backgroundColor = '#000000'
+        } else {
+            document.body.style.backgroundColor = ''
+        }
+    } catch {}
 }
 
 export function applyUITheme(settings: UIThemeSettings) {

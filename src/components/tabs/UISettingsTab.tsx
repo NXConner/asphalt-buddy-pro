@@ -77,22 +77,22 @@ const defaultWallpapers = [
   {
     id: '1',
     name: 'Asphalt Texture',
-    file: '/api/placeholder/1920/1080',
-    preview: '/api/placeholder/300/200',
+    file: '/wallpapers/asphalt.svg',
+    preview: '/wallpapers/asphalt.svg',
     isActive: false
   },
   {
     id: '2',
     name: 'Construction Site',
-    file: '/api/placeholder/1920/1080',
-    preview: '/api/placeholder/300/200',
+    file: '/wallpapers/construction.svg',
+    preview: '/wallpapers/construction.svg',
     isActive: false
   },
   {
     id: '3',
     name: 'Road Work',
-    file: '/api/placeholder/1920/1080',
-    preview: '/api/placeholder/300/200',
+    file: '/wallpapers/roadwork.svg',
+    preview: '/wallpapers/roadwork.svg',
     isActive: false
   }
 ];
@@ -151,7 +151,25 @@ export const UISettingsTab = () => {
     // Load saved settings
     const saved = localStorage.getItem('uiSettings');
     if (saved) {
-      setSettings(JSON.parse(saved));
+      try {
+        const parsed = JSON.parse(saved);
+        // Migrate placeholder wallpapers to new SVG assets if present
+        if (Array.isArray(parsed?.wallpapers)) {
+          parsed.wallpapers = parsed.wallpapers.map((w: any) => {
+            if (w?.name === 'Asphalt Texture') return { ...w, file: '/wallpapers/asphalt.svg', preview: '/wallpapers/asphalt.svg' };
+            if (w?.name === 'Construction Site') return { ...w, file: '/wallpapers/construction.svg', preview: '/wallpapers/construction.svg' };
+            if (w?.name === 'Road Work') return { ...w, file: '/wallpapers/roadwork.svg', preview: '/wallpapers/roadwork.svg' };
+            return w;
+          });
+        }
+        setSettings(parsed);
+        const active = parsed?.wallpapers?.find((w: any) => w.isActive);
+        if (active?.file) {
+          applyUITheme({ ...(parsed.theme || {}), backgroundImage: active.file } as any);
+        }
+      } catch {
+        setSettings(prev => prev);
+      }
     }
   }, []);
 
@@ -239,13 +257,25 @@ export const UISettingsTab = () => {
   };
 
   const setActiveWallpaper = (id: string) => {
-    setSettings(prev => ({
-      ...prev,
-      wallpapers: prev.wallpapers.map(w => ({
+    setSettings(prev => {
+      const nextWallpapers = prev.wallpapers.map(w => ({
         ...w,
         isActive: w.id === id
-      }))
-    }));
+      }));
+      const active = nextWallpapers.find(w => w.isActive);
+      const next = {
+        ...prev,
+        wallpapers: nextWallpapers,
+        theme: {
+          ...prev.theme,
+          backgroundImage: active?.file
+        }
+      } as UISettings;
+      if (isPreviewMode && active?.file) {
+        applyUITheme(next.theme as any);
+      }
+      return next;
+    });
   };
 
   const deleteCustomItem = (type: 'sound' | 'wallpaper', id: string) => {
@@ -391,7 +421,7 @@ export const UISettingsTab = () => {
                 {predefinedThemes.map((theme, index) => (
                   <Card 
                     key={index} 
-                    className={`cursor-pointer transition-all hover:shadow-lg ${
+                    className={`cursor-pointer transition-all hover:shadow-lg active:scale-[0.98] ${
                       settings.theme.accentColor === theme.primary ? 'ring-2 ring-primary' : ''
                     }`}
                     onClick={() => applyTheme(theme)}
@@ -692,7 +722,7 @@ export const UISettingsTab = () => {
                 {settings.wallpapers.map((wallpaper) => (
                   <Card 
                     key={wallpaper.id} 
-                    className={`cursor-pointer transition-all hover:shadow-lg ${
+                    className={`cursor-pointer transition-all hover:shadow-lg active:scale-[0.98] ${
                       wallpaper.isActive ? 'ring-2 ring-primary' : ''
                     }`}
                   >
@@ -705,7 +735,7 @@ export const UISettingsTab = () => {
                         <div>
                           <h4 className="font-medium">{wallpaper.name}</h4>
                           {wallpaper.isActive && (
-                            <Badge variant="default" className="text-xs mt-1">Active</Badge>
+                            <Badge className="text-xs mt-1">Active</Badge>
                           )}
                         </div>
                         <div className="flex gap-2">
