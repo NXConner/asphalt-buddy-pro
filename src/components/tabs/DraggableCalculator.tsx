@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Calculator, Minimize, Maximize } from "lucide-react";
 
 interface DraggableCalculatorProps {
   isOpen: boolean;
@@ -29,7 +28,7 @@ export const DraggableCalculator = ({ isOpen, onClose }: DraggableCalculatorProp
     const handleMouseMove = (e: MouseEvent) => {
       setPosition({
         x: e.clientX - offsetX,
-        y: e.clientY - offsetY
+        y: e.clientY - offsetY,
       });
     };
 
@@ -43,16 +42,32 @@ export const DraggableCalculator = ({ isOpen, onClose }: DraggableCalculatorProp
     document.addEventListener('mouseup', handleMouseUp);
   };
 
-  const inputNumber = (num: string) => {
+  const inputDigit = (digit: string) => {
     if (waitingForOperand) {
-      setDisplay(num);
+      setDisplay(digit);
       setWaitingForOperand(false);
     } else {
-      setDisplay(display === '0' ? num : display + num);
+      setDisplay(display === '0' ? digit : display + digit);
     }
   };
 
-  const inputOperation = (nextOperation: string) => {
+  const inputDecimal = () => {
+    if (waitingForOperand) {
+      setDisplay('0.');
+      setWaitingForOperand(false);
+    } else if (display.indexOf('.') === -1) {
+      setDisplay(display + '.');
+    }
+  };
+
+  const clear = () => {
+    setDisplay('0');
+    setPreviousValue(null);
+    setOperation(null);
+    setWaitingForOperand(false);
+  };
+
+  const performOperation = (nextOperation?: string) => {
     const inputValue = parseFloat(display);
 
     if (previousValue === null) {
@@ -66,18 +81,18 @@ export const DraggableCalculator = ({ isOpen, onClose }: DraggableCalculatorProp
     }
 
     setWaitingForOperand(true);
-    setOperation(nextOperation);
+    setOperation(nextOperation || null);
   };
 
-  const calculate = (firstValue: number, secondValue: number, operation: string) => {
+  const calculate = (firstValue: number, secondValue: number, operation: string): number => {
     switch (operation) {
       case '+':
         return firstValue + secondValue;
       case '-':
         return firstValue - secondValue;
-      case '×':
+      case '*':
         return firstValue * secondValue;
-      case '÷':
+      case '/':
         return firstValue / secondValue;
       case '=':
         return secondValue;
@@ -86,138 +101,177 @@ export const DraggableCalculator = ({ isOpen, onClose }: DraggableCalculatorProp
     }
   };
 
-  const performCalculation = () => {
-    const inputValue = parseFloat(display);
-
-    if (previousValue !== null && operation) {
-      const newValue = calculate(previousValue, inputValue, operation);
-      setDisplay(String(newValue));
-      setPreviousValue(null);
-      setOperation(null);
-      setWaitingForOperand(true);
-    }
-  };
-
-  const clear = () => {
-    setDisplay('0');
-    setPreviousValue(null);
-    setOperation(null);
-    setWaitingForOperand(false);
-  };
-
-  const clearEntry = () => {
-    setDisplay('0');
-  };
-
-  const buttons = [
-    ['CE', 'C', '⌫', '÷'],
-    ['7', '8', '9', '×'],
-    ['4', '5', '6', '-'],
-    ['1', '2', '3', '+'],
-    ['±', '0', '.', '=']
-  ];
-
-  if (isMinimized) {
-    return (
-      <div
-        className="fixed z-50 bg-primary text-primary-foreground rounded-lg p-2 cursor-move shadow-lg"
-        style={{ left: position.x, top: position.y }}
-        onMouseDown={handleMouseDown}
-      >
-        <div className="flex items-center gap-2">
-          <Calculator className="h-4 w-4" />
-          <span className="text-sm font-medium">Calculator</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0 text-primary-foreground hover:bg-primary-foreground/20"
-            onClick={() => setIsMinimized(false)}
-          >
-            <Maximize2 className="h-3 w-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0 text-primary-foreground hover:bg-primary-foreground/20"
-            onClick={onClose}
-          >
-            <X className="h-3 w-3" />
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  const buttonClass = "h-12 text-lg font-semibold";
 
   return (
     <div
-      className="fixed z-50 bg-background border rounded-lg shadow-2xl"
-      style={{ left: position.x, top: position.y, width: '280px' }}
+      className={`fixed z-50 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+      style={{
+        left: position.x,
+        top: position.y,
+        width: isMinimized ? 'auto' : '320px',
+      }}
     >
-      <Card className="border-0 shadow-none">
+      <Card className="shadow-lg border-2 bg-background/95 backdrop-blur">
         <CardHeader 
-          className="pb-2 cursor-move bg-muted/50 rounded-t-lg"
+          className="cursor-move pb-2 flex flex-row items-center justify-between"
           onMouseDown={handleMouseDown}
         >
-          <div className="flex justify-between items-center">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <Calculator className="h-4 w-4" />
-              Calculator
-            </CardTitle>
-            <div className="flex gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0"
-                onClick={() => setIsMinimized(true)}
-              >
-                <Minimize2 className="h-3 w-3" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0"
-                onClick={onClose}
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
+          <CardTitle className="text-lg flex items-center gap-2">
+            🧮 Calculator
+          </CardTitle>
+          <div className="flex gap-1">
+            <Button variant="ghost" size="sm" onClick={() => setIsMinimized(!isMinimized)}>
+              {isMinimized ? '◰' : '◱'}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              ✕
+            </Button>
           </div>
         </CardHeader>
-        <CardContent className="p-4">
-          <div className="mb-4">
+
+        {!isMinimized && (
+          <CardContent className="space-y-3">
             <Input
               value={display}
               readOnly
-              className="text-right text-xl font-mono bg-muted"
+              className="text-right text-2xl font-mono h-12 bg-muted"
             />
-          </div>
-          
-          <div className="grid grid-cols-4 gap-2">
-            {buttons.flat().map((btn) => (
+            
+            <div className="grid grid-cols-4 gap-2">
               <Button
-                key={btn}
-                variant={['÷', '×', '-', '+', '='].includes(btn) ? "default" : "outline"}
-                className="h-12 text-sm font-medium"
-                onClick={() => {
-                  if (btn === 'C') clear();
-                  else if (btn === 'CE') clearEntry();
-                  else if (btn === '⌫') setDisplay(display.slice(0, -1) || '0');
-                  else if (btn === '±') setDisplay(String(-parseFloat(display)));
-                  else if (btn === '=') performCalculation();
-                  else if (['÷', '×', '-', '+'].includes(btn)) inputOperation(btn);
-                  else if (btn === '.') {
-                    if (display.indexOf('.') === -1) {
-                      inputNumber(display === '0' ? '0.' : display + '.');
-                    }
-                  }
-                  else inputNumber(btn);
-                }}
+                variant="outline"
+                className={buttonClass}
+                onClick={clear}
               >
-                {btn}
+                C
               </Button>
-            ))}
-          </div>
-        </CardContent>
+              <Button
+                variant="outline"
+                className={buttonClass}
+                onClick={() => setDisplay(display.slice(0, -1) || '0')}
+              >
+                ⌫
+              </Button>
+              <Button
+                variant="outline"
+                className={buttonClass}
+                onClick={() => performOperation('/')}
+              >
+                ÷
+              </Button>
+              <Button
+                variant="outline"
+                className={buttonClass}
+                onClick={() => performOperation('*')}
+              >
+                ×
+              </Button>
+
+              <Button
+                variant="outline"
+                className={buttonClass}
+                onClick={() => inputDigit('7')}
+              >
+                7
+              </Button>
+              <Button
+                variant="outline"
+                className={buttonClass}
+                onClick={() => inputDigit('8')}
+              >
+                8
+              </Button>
+              <Button
+                variant="outline"
+                className={buttonClass}
+                onClick={() => inputDigit('9')}
+              >
+                9
+              </Button>
+              <Button
+                variant="outline"
+                className={buttonClass}
+                onClick={() => performOperation('-')}
+              >
+                −
+              </Button>
+
+              <Button
+                variant="outline"
+                className={buttonClass}
+                onClick={() => inputDigit('4')}
+              >
+                4
+              </Button>
+              <Button
+                variant="outline"
+                className={buttonClass}
+                onClick={() => inputDigit('5')}
+              >
+                5
+              </Button>
+              <Button
+                variant="outline"
+                className={buttonClass}
+                onClick={() => inputDigit('6')}
+              >
+                6
+              </Button>
+              <Button
+                variant="outline"
+                className={buttonClass}
+                onClick={() => performOperation('+')}
+              >
+                +
+              </Button>
+
+              <Button
+                variant="outline"
+                className={buttonClass}
+                onClick={() => inputDigit('1')}
+              >
+                1
+              </Button>
+              <Button
+                variant="outline"
+                className={buttonClass}
+                onClick={() => inputDigit('2')}
+              >
+                2
+              </Button>
+              <Button
+                variant="outline"
+                className={buttonClass}
+                onClick={() => inputDigit('3')}
+              >
+                3
+              </Button>
+              <Button
+                variant="default"
+                className={`${buttonClass} row-span-2`}
+                onClick={() => performOperation('=')}
+              >
+                =
+              </Button>
+
+              <Button
+                variant="outline"
+                className={`${buttonClass} col-span-2`}
+                onClick={() => inputDigit('0')}
+              >
+                0
+              </Button>
+              <Button
+                variant="outline"
+                className={buttonClass}
+                onClick={inputDecimal}
+              >
+                .
+              </Button>
+            </div>
+          </CardContent>
+        )}
       </Card>
     </div>
   );
