@@ -20,6 +20,28 @@
   </head>
 
   <body>
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('uiSettings');
+          var mode = 'dark';
+          if (saved) {
+            var parsed = JSON.parse(saved);
+            if (parsed && parsed.theme && parsed.theme.mode) mode = parsed.theme.mode;
+          }
+          var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var isDark = mode === 'dark' || (mode === 'auto' && prefersDark);
+          var root = document.documentElement;
+          if (isDark) {
+            root.classList.add('dark');
+            root.classList.remove('light');
+          } else {
+            root.classList.add('light');
+            root.classList.remove('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
