@@ -474,6 +474,29 @@ useEffect(() => {
 		return null;
 	}
 
+	function goToMyLocation() {
+		if (!map) return;
+		const targetZoom = 19;
+		if (coords) {
+			map.flyTo([coords.lat, coords.lng], targetZoom, { duration: 0.6 });
+			return;
+		}
+		try {
+			navigator.geolocation.getCurrentPosition(
+				(pos) => {
+					setPosition(pos);
+					map.flyTo([pos.coords.latitude, pos.coords.longitude], targetZoom, { duration: 0.6 });
+				},
+				(err) => {
+					setError(err.message);
+				},
+				{ enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+			);
+		} catch {
+			// ignore
+		}
+	}
+
 	return (
 		<div className="space-y-4">
 			<div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
@@ -548,10 +571,19 @@ useEffect(() => {
 				</div>
 			)}
 
-			<div className="w-full h-[60vh] rounded-lg overflow-hidden border">
+			<div className="w-full h-[60vh] rounded-lg overflow-hidden border relative">
+				<button
+					onClick={goToMyLocation}
+					disabled={!hasGeolocation}
+					className="absolute top-2 left-2 z-[1000] border rounded px-3 py-2 bg-background/90 backdrop-blur active:scale-95 transition-transform disabled:opacity-60 shadow"
+					title={hasGeolocation ? "Center on my location" : "Geolocation not supported"}
+				>
+					Locate
+				</button>
 				<MapContainer
 					center={[36.5859718, -79.86153]}
 					zoom={10}
+					maxZoom={20}
 					style={{ width: "100%", height: "100%" }}
 					zoomControl={false}
 				>
