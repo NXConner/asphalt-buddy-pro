@@ -377,12 +377,12 @@ useEffect(() => {
 					placeholder="Search address or place"
 					className="border rounded px-3 py-2 w-full sm:max-w-md"
 				/>
-				<button
+                <button
 					onClick={async () => {
 						const r = await searchAddress(query);
 						setResults(r);
 					}}
-					className="border rounded px-3 py-2"
+                  className="border rounded px-3 py-2 active:scale-95 transition-transform"
 				>
 					Search
 				</button>
@@ -562,7 +562,7 @@ useEffect(() => {
 						<li>Work-hours device usage monitoring</li>
 					</ul>
 					<div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-						<button className="border rounded px-3 py-2" onClick={aiDetect}>AI Detect Asphalt (preview)</button>
+                        <button className="border rounded px-3 py-2 active:scale-95 transition-transform" onClick={aiDetect}>AI Detect Asphalt (preview)</button>
 						<div className="flex items-center gap-2">
 							<label className="text-sm">Employee playback</label>
 							<select className="border rounded px-2 py-1" value={selectedEmployeeId ?? ""} onChange={(e) => { setSelectedEmployeeId(e.target.value || null); setPlaybackIdx(0); }}>
@@ -572,10 +572,10 @@ useEffect(() => {
 						</div>
 						{selectedEmployee && (
 							<div className="flex items-center gap-2">
-								<button className="border rounded px-2 py-1" onClick={() => setPlaybackIdx(i => Math.max(i-1, 0))}>Prev</button>
+                                <button className="border rounded px-2 py-1 active:scale-95 transition-transform" onClick={() => setPlaybackIdx(i => Math.max(i-1, 0))}>Prev</button>
 								<div className="text-xs text-muted-foreground">Point {playbackIdx + 1}/{selectedEmployee.path.length}</div>
-								<button className="border rounded px-2 py-1" onClick={() => setPlaybackIdx(i => Math.min(i+1, selectedEmployee.path.length-1))}>Next</button>
-								<button className="border rounded px-2 py-1" onClick={() => setPlaybackPlaying(p => !p)}>{playbackPlaying ? "Pause" : "Play"}</button>
+                                <button className="border rounded px-2 py-1 active:scale-95 transition-transform" onClick={() => setPlaybackIdx(i => Math.min(i+1, selectedEmployee.path.length-1))}>Next</button>
+                                <button className="border rounded px-2 py-1 active:scale-95 transition-transform" onClick={() => setPlaybackPlaying(p => !p)}>{playbackPlaying ? "Pause" : "Play"}</button>
 								<label className="text-xs text-muted-foreground">Speed</label>
 								<input type="range" min={200} max={1500} step={100} value={playbackSpeedMs} onChange={(e) => setPlaybackSpeedMs(parseInt(e.target.value))} />
 								<div className="text-xs">MPH: {mph.toFixed(1)}</div>
@@ -628,10 +628,10 @@ useEffect(() => {
 				<div className="text-sm mb-2">{etaText}</div>
 				{radarFrames.length > 0 && (
 					<div className="flex items-center gap-3">
-						<button className="border rounded px-2 py-1" onClick={() => setRadarIdx((i) => (i - 1 + radarFrames.length) % radarFrames.length)}>Prev</button>
+                        <button className="border rounded px-2 py-1 active:scale-95 transition-transform" onClick={() => setRadarIdx((i) => (i - 1 + radarFrames.length) % radarFrames.length)}>Prev</button>
 						<div className="text-xs text-muted-foreground">Frame {radarIdx + 1}/{radarFrames.length}</div>
-						<button className="border rounded px-2 py-1" onClick={() => setRadarIdx((i) => (i + 1) % radarFrames.length)}>Next</button>
-						<button className="border rounded px-2 py-1" onClick={() => setRadarPlaying(p => !p)}>{radarPlaying ? "Pause" : "Play"}</button>
+                        <button className="border rounded px-2 py-1 active:scale-95 transition-transform" onClick={() => setRadarIdx((i) => (i + 1) % radarFrames.length)}>Next</button>
+                        <button className="border rounded px-2 py-1 active:scale-95 transition-transform" onClick={() => setRadarPlaying(p => !p)}>{radarPlaying ? "Pause" : "Play"}</button>
 						<label className="text-xs text-muted-foreground">Speed</label>
 						<input type="range" min={200} max={1500} step={100} value={radarSpeedMs} onChange={(e) => setRadarSpeedMs(parseInt(e.target.value))} />
 					</div>

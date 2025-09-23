@@ -17,6 +17,7 @@ export interface UIThemeSettings {
 	reducedMotion: boolean
 	fontSize: 'small' | 'medium' | 'large'
 	borderRadius: 'none' | 'small' | 'medium' | 'large'
+  backgroundImage?: string
 }
 
 const RADIUS_MAP: Record<NonNullable<UIThemeSettings['borderRadius']>, string> = {
@@ -55,6 +56,19 @@ export function applyThemeVariables(settings: UIThemeSettings) {
 		// We can expose an alpha custom prop used in classes if desired
 		root.style.setProperty('--bg-opacity', `${settings.backgroundOpacity}`)
 	}
+
+  // Apply wallpaper background image if provided
+  try {
+    if (settings.backgroundImage) {
+      const url = settings.backgroundImage
+      document.body.style.backgroundImage = `url("${url}")`
+      document.body.style.backgroundSize = 'cover'
+      document.body.style.backgroundPosition = 'center'
+      document.body.style.backgroundAttachment = 'fixed'
+    } else {
+      document.body.style.backgroundImage = ''
+    }
+  } catch {}
 
 	// Border radius
 	if (settings.borderRadius) {
