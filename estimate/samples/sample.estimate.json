@@ -36,10 +36,10 @@
     },
     "clientProvidedItems": ["Switches", "Server rack"],
     "alternates": [
-      { "id": "ALT-01", "name": "Upgrade flooring to LVT", "impact": "+$4,500" }
+      { "id": "ALT-01", "name": "Upgrade flooring to LVT", "impact": "+$4,500", "amount": 4500, "includeInTotal": false }
     ],
     "allowances": [
-      { "id": "ALW-01", "name": "Owner-selected fixtures", "amount": 2500 }
+      { "id": "ALW-01", "name": "Owner-selected fixtures", "amount": 2500, "includeInTotal": true }
     ]
   },
   "costs": {
@@ -53,23 +53,23 @@
     },
     "materials": {
       "items": [
-        { "id": "MAT-01", "description": "Drywall sheets", "quantity": 300, "units": "sheet", "unitCost": 12.5, "wasteFactor": 0.08, "source": "Supplier A quote 9/20" },
-        { "id": "MAT-02", "description": "Paint gallons", "quantity": 80, "units": "gal", "unitCost": 28, "wasteFactor": 0.05 }
+        { "id": "MAT-01", "description": "Drywall sheets", "quantity": 300, "units": "sheet", "unitCost": 12.5, "wasteFactor": 0.08, "source": "Supplier A quote 9/20", "wbsCode": "09-21" },
+        { "id": "MAT-02", "description": "Paint gallons", "quantity": 80, "units": "gal", "unitCost": 28, "wasteFactor": 0.05, "wbsCode": "09-90" }
       ],
       "freightCost": 650,
       "dutiesTaxesPct": 0
     },
     "equipment": {
       "items": [
-        { "id": "EQ-01", "description": "Scissor lift", "hours": 120, "rate": 18 },
-        { "id": "EQ-02", "description": "Compressor", "hours": 90, "rate": 10 }
+        { "id": "EQ-01", "description": "Scissor lift", "hours": 120, "rate": 18, "wbsCode": "01-54" },
+        { "id": "EQ-02", "description": "Compressor", "hours": 90, "rate": 10, "wbsCode": "01-54" }
       ],
       "fuelPct": 0.12,
       "mobilizationLumpSum": 800
     },
     "subcontractors": [
-      { "id": "SUB-01", "name": "Electrical Co", "quote": 18500, "scope": "Electrical rough-in and finish", "validThrough": "2025-10-31", "exclusions": ["Fire alarm"] },
-      { "id": "SUB-02", "name": "HVAC LLC", "quote": 13200, "scope": "Ductwork and RTU tie-in" }
+      { "id": "SUB-01", "name": "Electrical Co", "quote": 18500, "scope": "Electrical rough-in and finish", "validThrough": "2025-10-31", "exclusions": ["Fire alarm"], "wbsCode": "26-00" },
+      { "id": "SUB-02", "name": "HVAC LLC", "quote": 13200, "scope": "Ductwork and RTU tie-in", "wbsCode": "23-00" }
     ],
     "permitsAndFees": {
       "permitFees": 1200,

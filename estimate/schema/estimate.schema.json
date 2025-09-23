@@ -58,12 +58,14 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["id", "name", "impact"],
+            "required": ["id", "name"],
             "additionalProperties": false,
             "properties": {
               "id": { "type": "string" },
               "name": { "type": "string" },
-              "impact": { "type": "string" }
+              "impact": { "type": "string" },
+              "amount": { "type": "number", "minimum": 0 },
+              "includeInTotal": { "type": "boolean" }
             }
           }
         },
@@ -76,7 +78,8 @@
             "properties": {
               "id": { "type": "string" },
               "name": { "type": "string" },
-              "amount": { "type": "number", "minimum": 0 }
+              "amount": { "type": "number", "minimum": 0 },
+              "includeInTotal": { "type": "boolean" }
             }
           }
         }
@@ -129,7 +132,8 @@
                   "units": { "type": "string" },
                   "unitCost": { "type": "number", "minimum": 0 },
                   "wasteFactor": { "type": "number", "minimum": 0 },
-                  "source": { "type": "string" }
+                  "source": { "type": "string" },
+                  "wbsCode": { "type": "string" }
                 }
               }
             },
@@ -152,7 +156,8 @@
                   "id": { "type": "string" },
                   "description": { "type": "string" },
                   "hours": { "type": "number", "minimum": 0 },
-                  "rate": { "type": "number", "minimum": 0 }
+                  "rate": { "type": "number", "minimum": 0 },
+                  "wbsCode": { "type": "string" }
                 }
               }
             },
@@ -172,7 +177,8 @@
               "quote": { "type": "number", "minimum": 0 },
               "scope": { "type": "string" },
               "validThrough": { "type": "string", "format": "date" },
-              "exclusions": { "type": "array", "items": { "type": "string" } }
+              "exclusions": { "type": "array", "items": { "type": "string" } },
+              "wbsCode": { "type": "string" }
             }
           }
         },
