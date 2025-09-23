@@ -42,6 +42,39 @@ server.get('/health/deps', async () => {
   return { db: 'ok', redis: redisOk };
 });
 
+// Geocoding proxy to Nominatim with proper headers and optional contact email
+server.get('/geocode', async (request, reply) => {
+  const QuerySchema = z.object({ q: z.string().min(3), limit: z.string().optional() });
+  const { q, limit } = QuerySchema.parse(request.query as Record<string, string>);
+
+  const url = new URL('https://nominatim.openstreetmap.org/search');
+  url.searchParams.set('q', q);
+  url.searchParams.set('format', 'json');
+  url.searchParams.set('addressdetails', '1');
+  url.searchParams.set('limit', limit ?? '5');
+  if (env.NOMINATIM_EMAIL) {
+    url.searchParams.set('email', env.NOMINATIM_EMAIL);
+  }
+
+  const userAgent = `OverWatch/1.0 (${env.NOMINATIM_EMAIL ?? 'no-email@localhost'})`;
+  const acceptLanguage = request.headers['accept-language'] ?? 'en';
+
+  const res = await fetch(url.toString(), {
+    headers: {
+      'User-Agent': userAgent,
+      'Accept': 'application/json',
+      'Accept-Language': Array.isArray(acceptLanguage) ? acceptLanguage.join(', ') : String(acceptLanguage)
+    }
+  });
+
+  if (!res.ok) {
+    request.log.warn({ status: res.status, statusText: res.statusText }, 'Nominatim responded with non-OK');
+    return reply.code(res.status).send({ error: 'geocode_failed', status: res.status, message: res.statusText });
+  }
+  const data = await res.json();
+  return reply.send(data);
+});
+
 const port = Number(env.PORT);
 const host = env.HOST;
 
