@@ -6,9 +6,11 @@ import { z } from 'zod';
 import { loadEnv } from './env.js';
 import { prisma } from '@acme/db';
 import { redis } from './redis.js';
+import { initTelemetry } from './telemetry.js';
 
 // Initialize env and telemetry upfront
 const env = loadEnv();
+await initTelemetry();
 
 const server = Fastify({
   logger: {
