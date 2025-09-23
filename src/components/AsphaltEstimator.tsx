@@ -1,9 +1,9 @@
-import { Suspense, useEffect, useRef, useState, lazy } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Settings } from "@/components/icons";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { EstimatorTab } from "./tabs/EstimatorTab";
-const OverwatchTab = lazy(() => import("./tabs/OverwatchTab").then(m => ({ default: m.OverwatchTab })));
+const OverwatchTab = React.lazy(() => import("./tabs/OverwatchTab").then(m => ({ default: m.OverwatchTab })));
 import { SettingsTab } from "./tabs/SettingsTab";
 import { CustomersTab } from "./tabs/CustomersTab";
 import { InvoicesTab } from "./tabs/InvoicesTab";
@@ -12,6 +12,7 @@ import { DocumentsTab } from "./tabs/DocumentsTab";
 import { StencilCatalogTab } from "./tabs/StencilCatalogTab";
 import { PremiumServicesTab } from "./tabs/PremiumServicesTab";
 import { BestPracticesTab } from "./tabs/BestPracticesTab";
+import ChecklistTab from "./tabs/ChecklistTab";
 import { ComplianceTab } from "./tabs/ComplianceTab";
 import { ProfileTab } from "./tabs/ProfileTab";
 import { UISettingsTab } from "./tabs/UISettingsTab";
@@ -47,7 +48,15 @@ const AsphaltEstimator = () => {
     };
 
     window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
+    const navHandler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { tab?: string } | undefined;
+      if (detail?.tab) setActiveTab(detail.tab);
+    };
+    window.addEventListener('navigate-tab', navHandler as EventListener);
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+      window.removeEventListener('navigate-tab', navHandler as EventListener);
+    };
   }, [isFullscreen, showCalculator]);
 
   return (
@@ -80,6 +89,9 @@ const AsphaltEstimator = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="relative mb-6">
             <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12 gap-1 h-auto p-1">
+              <TabsTrigger value="checklist" className="flex items-center gap-2">
+                📋 Checklist
+              </TabsTrigger>
               <TabsTrigger value="estimator" className="flex items-center gap-2">
                 🧮 Estimator
               </TabsTrigger>
@@ -124,14 +136,18 @@ const AsphaltEstimator = () => {
           </div>
 
           <div className="min-h-[600px]">
+            <TabsContent value="checklist">
+              <ChecklistTab />
+            </TabsContent>
+
             <TabsContent value="estimator">
               <EstimatorTab />
             </TabsContent>
 
             <TabsContent value="overwatch">
-              <Suspense fallback={<div>Loading Overwatch...</div>}>
+              <React.Suspense fallback={<div>Loading Overwatch...</div>}>
                 <OverwatchTab />
-              </Suspense>
+              </React.Suspense>
             </TabsContent>
 
             <TabsContent value="settings">
