@@ -43,13 +43,15 @@ export const StencilCatalogTab = () => {
     stallLines: { quantity: 0, pricePer: 0, color: 'white' },
     letters: { quantity: 0, pricePer: 0, color: 'white' },
     numbers: { quantity: 0, pricePer: 0, color: 'white' },
-    handicap: { quantity: 0, pricePer: 0, color: 'blue' },
+    crossWalks: { quantity: 0, pricePer: 0, color: 'white' },
+    hatch: { quantity: 0, pricePer: 0, color: 'white' },
+    handicap: { quantity: 0, pricePer: 0, backgroundColor: 'blue', symbolColor: 'white' },
     arrows: {
       straight: { quantity: 0, pricePer: 0, color: 'white' },
       leftTurn: { quantity: 0, pricePer: 0, color: 'white' },
       rightTurn: { quantity: 0, pricePer: 0, color: 'white' }
     },
-    curbStops: { quantity: 0, pricePer: 0, color: 'yellow' },
+    curbStops: { quantity: 0, pricePer: 0, color: 'unpainted' },
     fireLane: { quantity: 0, pricePer: 0, color: 'red' }
   });
 
@@ -104,6 +106,8 @@ export const StencilCatalogTab = () => {
       s.stallLines.quantity * s.stallLines.pricePer +
       s.letters.quantity * s.letters.pricePer +
       s.numbers.quantity * s.numbers.pricePer +
+      s.crossWalks.quantity * s.crossWalks.pricePer +
+      s.hatch.quantity * s.hatch.pricePer +
       s.handicap.quantity * s.handicap.pricePer +
       s.curbStops.quantity * s.curbStops.pricePer +
       s.fireLane.quantity * s.fireLane.pricePer
@@ -120,6 +124,10 @@ export const StencilCatalogTab = () => {
     { value: 'white', label: 'White' },
     { value: 'blue', label: 'Blue' },
     { value: 'yellow', label: 'Yellow' }
+  ];
+  const curbStopColorOptions = [
+    { value: 'unpainted', label: 'Unpainted' },
+    ...colorOptions
   ];
 
   const categories = ['all', ...Array.from(new Set(stencils.map(s => s.category)))];
@@ -320,6 +328,100 @@ export const StencilCatalogTab = () => {
 
           <Separator />
 
+          {/* Crosswalks */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <Label htmlFor="crossWalksQty">Crosswalks - Quantity</Label>
+              <Input
+                id="crossWalksQty"
+                type="number"
+                value={lineStriping.crossWalks.quantity}
+                onChange={(e) => setLineStriping(prev => ({
+                  ...prev,
+                  crossWalks: { ...prev.crossWalks, quantity: parseFloat(e.target.value) || 0 }
+                }))}
+                className="input-professional"
+              />
+            </div>
+            <div>
+              <Label htmlFor="crossWalksPrice">Price per Crosswalk</Label>
+              <Input
+                id="crossWalksPrice"
+                type="number"
+                value={lineStriping.crossWalks.pricePer}
+                onChange={(e) => setLineStriping(prev => ({
+                  ...prev,
+                  crossWalks: { ...prev.crossWalks, pricePer: parseFloat(e.target.value) || 0 }
+                }))}
+                className="input-professional"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <Label>Paint Color</Label>
+              <Select value={lineStriping.crossWalks.color} onValueChange={(v) => setLineStriping(prev => ({
+                ...prev,
+                crossWalks: { ...prev.crossWalks, color: v }
+              }))}>
+                <SelectTrigger className="w-full md:w-64">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {colorOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Hatch */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <Label htmlFor="hatchQty">Hatch - Quantity</Label>
+              <Input
+                id="hatchQty"
+                type="number"
+                value={lineStriping.hatch.quantity}
+                onChange={(e) => setLineStriping(prev => ({
+                  ...prev,
+                  hatch: { ...prev.hatch, quantity: parseFloat(e.target.value) || 0 }
+                }))}
+                className="input-professional"
+              />
+            </div>
+            <div>
+              <Label htmlFor="hatchPrice">Price per Hatch Area</Label>
+              <Input
+                id="hatchPrice"
+                type="number"
+                value={lineStriping.hatch.pricePer}
+                onChange={(e) => setLineStriping(prev => ({
+                  ...prev,
+                  hatch: { ...prev.hatch, pricePer: parseFloat(e.target.value) || 0 }
+                }))}
+                className="input-professional"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <Label>Paint Color</Label>
+              <Select value={lineStriping.hatch.color} onValueChange={(v) => setLineStriping(prev => ({
+                ...prev,
+                hatch: { ...prev.hatch, color: v }
+              }))}>
+                <SelectTrigger className="w-full md:w-64">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {colorOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <Separator />
+
           {/* Handicap Symbols */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
@@ -348,21 +450,39 @@ export const StencilCatalogTab = () => {
                 className="input-professional"
               />
             </div>
-            <div className="md:col-span-2">
-              <Label>Paint Color</Label>
-              <Select value={lineStriping.handicap.color} onValueChange={(v) => setLineStriping(prev => ({
-                ...prev,
-                handicap: { ...prev.handicap, color: v }
-              }))}>
-                <SelectTrigger className="w-full md:w-64">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {colorOptions.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Background Color</Label>
+                <Select value={lineStriping.handicap.backgroundColor} onValueChange={(v) => setLineStriping(prev => ({
+                  ...prev,
+                  handicap: { ...prev.handicap, backgroundColor: v }
+                }))}>
+                  <SelectTrigger className="w-full md:w-64">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {colorOptions.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Symbol Color</Label>
+                <Select value={lineStriping.handicap.symbolColor} onValueChange={(v) => setLineStriping(prev => ({
+                  ...prev,
+                  handicap: { ...prev.handicap, symbolColor: v }
+                }))}>
+                  <SelectTrigger className="w-full md:w-64">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {colorOptions.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
@@ -549,7 +669,7 @@ export const StencilCatalogTab = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {colorOptions.map(opt => (
+                  {curbStopColorOptions.map(opt => (
                     <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
@@ -729,7 +849,7 @@ export const StencilCatalogTab = () => {
               {lineStriping.handicap.quantity > 0 && lineStriping.handicap.pricePer > 0 && (
                 <div className="flex justify-between items-center py-2 border-b border-border/50">
                   <div>
-                    <p className="font-medium">Handicap Symbols ({lineStriping.handicap.color})</p>
+                    <p className="font-medium">Handicap Symbols (bg: {lineStriping.handicap.backgroundColor}, symbol: {lineStriping.handicap.symbolColor})</p>
                     <p className="text-sm text-muted-foreground">${lineStriping.handicap.pricePer} x {lineStriping.handicap.quantity}</p>
                   </div>
                   <p className="font-semibold">${(lineStriping.handicap.quantity * lineStriping.handicap.pricePer).toFixed(2)}</p>
@@ -771,6 +891,26 @@ export const StencilCatalogTab = () => {
                     <p className="text-sm text-muted-foreground">${lineStriping.curbStops.pricePer} x {lineStriping.curbStops.quantity}</p>
                   </div>
                   <p className="font-semibold">${(lineStriping.curbStops.quantity * lineStriping.curbStops.pricePer).toFixed(2)}</p>
+                </div>
+              )}
+
+              {lineStriping.crossWalks.quantity > 0 && lineStriping.crossWalks.pricePer > 0 && (
+                <div className="flex justify-between items-center py-2 border-b border-border/50">
+                  <div>
+                    <p className="font-medium">Crosswalks ({lineStriping.crossWalks.color})</p>
+                    <p className="text-sm text-muted-foreground">${lineStriping.crossWalks.pricePer} x {lineStriping.crossWalks.quantity}</p>
+                  </div>
+                  <p className="font-semibold">${(lineStriping.crossWalks.quantity * lineStriping.crossWalks.pricePer).toFixed(2)}</p>
+                </div>
+              )}
+
+              {lineStriping.hatch.quantity > 0 && lineStriping.hatch.pricePer > 0 && (
+                <div className="flex justify-between items-center py-2 border-b border-border/50">
+                  <div>
+                    <p className="font-medium">Hatch ({lineStriping.hatch.color})</p>
+                    <p className="text-sm text-muted-foreground">${lineStriping.hatch.pricePer} x {lineStriping.hatch.quantity}</p>
+                  </div>
+                  <p className="font-semibold">${(lineStriping.hatch.quantity * lineStriping.hatch.pricePer).toFixed(2)}</p>
                 </div>
               )}
 
