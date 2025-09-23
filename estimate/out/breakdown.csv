@@ -1,0 +1,13 @@
+Category,Amount
+Labor,39424.0
+Materials,7052.0
+Equipment,4227.2
+Subcontractors,31700.0
+Permits,2950.0
+DirectCost,85353.2
+WithInsuranceBond,87060.26
+WithEscalation,87713.22
+WithContingency,94730.27
+WithOverhead,100414.09
+WithProfit,106438.94
+TotalWithTax,115752.34
