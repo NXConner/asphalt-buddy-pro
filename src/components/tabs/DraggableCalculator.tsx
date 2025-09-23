@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Calculator, Minimize2, Maximize2 } from "lucide-react";
+import { X, Calculator, Minimize, Maximize } from "lucide-react";
 
 interface DraggableCalculatorProps {
   isOpen: boolean;

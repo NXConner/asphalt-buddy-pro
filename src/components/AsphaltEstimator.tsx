@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useRef, useState, lazy } from "react";
-import { Calculator, Settings, Users, FileText, DollarSign, FolderOpen, Palette, User, BookOpen, Sparkles, Shield } from "lucide-react";
+import { Calculator, Settings, Users, FileText, DollarSign, FolderOpen, Palette, User, BookOpen, Sparkles, ShieldCheck } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { EstimatorTab } from "./tabs/EstimatorTab";

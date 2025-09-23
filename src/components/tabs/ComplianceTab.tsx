@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BookOpen, Gavel, Scale, Shield, AlertTriangle, Droplets, Ruler, TrafficCone } from "lucide-react";
+import { BookOpen, Gavel, Scale, ShieldCheck, AlertTriangle, Droplets, Ruler, Construction } from "lucide-react";
 
 type RegionKey = 'general' | 'va' | 'nc';
 

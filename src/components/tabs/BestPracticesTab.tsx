@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BookOpen, Shield, AlertTriangle, CheckCircle, Star, Clock, Thermometer, Droplets } from "lucide-react";
+import { BookOpen, ShieldCheck, AlertTriangle, CheckCircle2, Star, Clock, Thermometer, Droplets } from "lucide-react";
 
 interface BestPractice {
   id: string;
