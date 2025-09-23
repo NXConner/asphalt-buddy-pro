@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Sparkles, Plus, Edit, Trash2, DollarSign, Clock, Star, TrendingUp } from "lucide-react";
+import { Sparkles, Plus, Edit, Trash2, DollarSign, Clock, Star, TrendingUp } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 
 interface PremiumService {

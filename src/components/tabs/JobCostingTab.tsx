@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { DollarSign, TrendingUp, TrendingDown, Plus, AlertTriangle } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Plus, AlertTriangle } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 
 interface JobCost {

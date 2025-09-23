@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { Calculator, Sparkles, Save } from "lucide-react";
+import { Calculator, Sparkles, Save } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 
 interface EstimateData {
