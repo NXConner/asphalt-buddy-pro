@@ -1,0 +1,100 @@
+{
+  "meta": {
+    "id": "EST-0001",
+    "name": "Small Office Buildout",
+    "client": "ACME Corp",
+    "currencyCode": "USD",
+    "baseCurrencyCode": "USD",
+    "exchangeRateToBase": 1,
+    "createdAt": "2025-09-23T10:00:00Z",
+    "revision": "A",
+    "validThrough": "2025-12-31",
+    "assumptions": [
+      "Building open during normal hours",
+      "Client provides network switches"
+    ],
+    "exclusions": [
+      "Hazardous material abatement"
+    ],
+    "wbsCode": "01-00"
+  },
+  "scope": {
+    "site": {
+      "location": "123 Main St, City, ST",
+      "access": "Street access, loading dock available",
+      "workHours": "Mon-Fri 7a-5p",
+      "utilitiesAvailable": true,
+      "constraints": [
+        "Noise restrictions after 5pm"
+      ]
+    },
+    "designMaturity": "design development",
+    "schedule": {
+      "durationMonths": 3,
+      "weatherDowntimePct": 0.05,
+      "accessWindows": "Mon-Fri"
+    },
+    "clientProvidedItems": ["Switches", "Server rack"],
+    "alternates": [
+      { "id": "ALT-01", "name": "Upgrade flooring to LVT", "impact": "+$4,500" }
+    ],
+    "allowances": [
+      { "id": "ALW-01", "name": "Owner-selected fixtures", "amount": 2500 }
+    ]
+  },
+  "costs": {
+    "labor": {
+      "baseLaborHours": 480,
+      "productivityFactor": 0.9,
+      "laborRate": 55,
+      "laborBurdenPct": 0.28,
+      "overtimeMultiplier": 1.05,
+      "notes": "Includes PM 40 hrs"
+    },
+    "materials": {
+      "items": [
+        { "id": "MAT-01", "description": "Drywall sheets", "quantity": 300, "units": "sheet", "unitCost": 12.5, "wasteFactor": 0.08, "source": "Supplier A quote 9/20" },
+        { "id": "MAT-02", "description": "Paint gallons", "quantity": 80, "units": "gal", "unitCost": 28, "wasteFactor": 0.05 }
+      ],
+      "freightCost": 650,
+      "dutiesTaxesPct": 0
+    },
+    "equipment": {
+      "items": [
+        { "id": "EQ-01", "description": "Scissor lift", "hours": 120, "rate": 18 },
+        { "id": "EQ-02", "description": "Compressor", "hours": 90, "rate": 10 }
+      ],
+      "fuelPct": 0.12,
+      "mobilizationLumpSum": 800
+    },
+    "subcontractors": [
+      { "id": "SUB-01", "name": "Electrical Co", "quote": 18500, "scope": "Electrical rough-in and finish", "validThrough": "2025-10-31", "exclusions": ["Fire alarm"] },
+      { "id": "SUB-02", "name": "HVAC LLC", "quote": 13200, "scope": "Ductwork and RTU tie-in" }
+    ],
+    "permitsAndFees": {
+      "permitFees": 1200,
+      "testingInspectionCosts": 800,
+      "disposalFees": 950
+    },
+    "risk": {
+      "contingencyPct": 0.08,
+      "insurancePct": 0.02,
+      "bondPct": 0
+    },
+    "overheadAndProfit": {
+      "overheadPct": 0.06,
+      "profitPct": 0.06
+    },
+    "taxes": {
+      "salesTaxPct": 0.0875
+    },
+    "commercial": {
+      "paymentTerms": "Net 30, 10% retention",
+      "retentionPct": 0.1,
+      "bondRequired": false
+    },
+    "escalation": {
+      "escalationPctPerYear": 0.03
+    }
+  }
+}
