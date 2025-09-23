@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MapContainer, TileLayer, LayersControl, ScaleControl, ZoomControl, Marker, Popup, useMap, Circle, WMSTileLayer, Polyline, Tooltip } from "react-leaflet";
+import { MapContainer, TileLayer, LayersControl, ScaleControl, ZoomControl, Marker, Popup, useMap, Circle, WMSTileLayer, Polyline, Tooltip, FeatureGroup } from "react-leaflet";
 import { fetchRainviewer, fetchForecast, computeRainEta, generateWeatherTips } from "@/lib/weather";
 import { supabase } from "@/integrations/supabase/client";
 import { searchAddress, GeocodeResult } from "@/lib/geocode";
@@ -60,6 +60,11 @@ const [alertsEnabled, setAlertsEnabled] = useState<boolean>(false);
 		stokesNC: { label: "Stokes County, NC", enabled: false, url: "", layers: "" },
 		surryNC: { label: "Surry County, NC", enabled: false, url: "", layers: "" },
 	});
+	// LayerGroup refs for syncing with LayersControl and external checkboxes
+	const patrickGroupRef = useRef<L.FeatureGroup | null>(null);
+	const henryGroupRef = useRef<L.FeatureGroup | null>(null);
+	const stokesGroupRef = useRef<L.FeatureGroup | null>(null);
+	const surryGroupRef = useRef<L.FeatureGroup | null>(null);
 	// Persist and restore county WMS configuration
 	useEffect(() => {
 		try {
@@ -90,6 +95,59 @@ const [alertsEnabled, setAlertsEnabled] = useState<boolean>(false);
 		return /^https?:\/\//i.test(url) && layers.trim().length > 0;
 	}
 	const [detecting, setDetecting] = useState<boolean>(false);
+
+	// Sync map overlay checkbox interactions back to local state
+	useEffect(() => {
+		if (!map) return;
+		function onAdd(e: any) {
+			if (e.layer === patrickGroupRef.current) setCountyLayers(s => ({ ...s, patrickVA: { ...s.patrickVA, enabled: true } }));
+			if (e.layer === henryGroupRef.current) setCountyLayers(s => ({ ...s, henryVA: { ...s.henryVA, enabled: true } }));
+			if (e.layer === stokesGroupRef.current) setCountyLayers(s => ({ ...s, stokesNC: { ...s.stokesNC, enabled: true } }));
+			if (e.layer === surryGroupRef.current) setCountyLayers(s => ({ ...s, surryNC: { ...s.surryNC, enabled: true } }));
+		}
+		function onRemove(e: any) {
+			if (e.layer === patrickGroupRef.current) setCountyLayers(s => ({ ...s, patrickVA: { ...s.patrickVA, enabled: false } }));
+			if (e.layer === henryGroupRef.current) setCountyLayers(s => ({ ...s, henryVA: { ...s.henryVA, enabled: false } }));
+			if (e.layer === stokesGroupRef.current) setCountyLayers(s => ({ ...s, stokesNC: { ...s.stokesNC, enabled: false } }));
+			if (e.layer === surryGroupRef.current) setCountyLayers(s => ({ ...s, surryNC: { ...s.surryNC, enabled: false } }));
+		}
+		map.on('overlayadd', onAdd);
+		map.on('overlayremove', onRemove);
+		return () => {
+			map.off('overlayadd', onAdd);
+			map.off('overlayremove', onRemove);
+		};
+	}, [map]);
+
+	// Ensure map reflects external checkbox state by adding/removing LayerGroups
+	useEffect(() => {
+		if (!map || !patrickGroupRef.current) return;
+		const layer = patrickGroupRef.current;
+		const has = map.hasLayer(layer);
+		if (countyLayers.patrickVA.enabled && !has) map.addLayer(layer);
+		if (!countyLayers.patrickVA.enabled && has) map.removeLayer(layer);
+	}, [map, countyLayers.patrickVA.enabled]);
+	useEffect(() => {
+		if (!map || !henryGroupRef.current) return;
+		const layer = henryGroupRef.current;
+		const has = map.hasLayer(layer);
+		if (countyLayers.henryVA.enabled && !has) map.addLayer(layer);
+		if (!countyLayers.henryVA.enabled && has) map.removeLayer(layer);
+	}, [map, countyLayers.henryVA.enabled]);
+	useEffect(() => {
+		if (!map || !stokesGroupRef.current) return;
+		const layer = stokesGroupRef.current;
+		const has = map.hasLayer(layer);
+		if (countyLayers.stokesNC.enabled && !has) map.addLayer(layer);
+		if (!countyLayers.stokesNC.enabled && has) map.removeLayer(layer);
+	}, [map, countyLayers.stokesNC.enabled]);
+	useEffect(() => {
+		if (!map || !surryGroupRef.current) return;
+		const layer = surryGroupRef.current;
+		const has = map.hasLayer(layer);
+		if (countyLayers.surryNC.enabled && !has) map.addLayer(layer);
+		if (!countyLayers.surryNC.enabled && has) map.removeLayer(layer);
+	}, [map, countyLayers.surryNC.enabled]);
 
 // Employee playback demo data and state
 type EmployeePathPoint = { lat: number; lng: number; t: number };
@@ -608,6 +666,35 @@ useEffect(() => {
 								<TileLayer url={radarFrames[radarIdx % radarFrames.length]} opacity={0.6} />
 							</LayersControl.Overlay>
 						)}
+						{/* County WMS Overlays in LayersControl */}
+						<LayersControl.Overlay name="Patrick County, VA" checked={countyLayers.patrickVA.enabled}>
+							<FeatureGroup ref={patrickGroupRef as any}>
+								{isValidWms(countyLayers.patrickVA.url, countyLayers.patrickVA.layers) && (
+									<WMSTileLayer url={countyLayers.patrickVA.url} params={{ layers: countyLayers.patrickVA.layers, format: 'image/png', transparent: true }} opacity={0.7} />
+								)}
+							</FeatureGroup>
+						</LayersControl.Overlay>
+						<LayersControl.Overlay name="Henry County, VA" checked={countyLayers.henryVA.enabled}>
+							<FeatureGroup ref={henryGroupRef as any}>
+								{isValidWms(countyLayers.henryVA.url, countyLayers.henryVA.layers) && (
+									<WMSTileLayer url={countyLayers.henryVA.url} params={{ layers: countyLayers.henryVA.layers, format: 'image/png', transparent: true }} opacity={0.7} />
+								)}
+							</FeatureGroup>
+						</LayersControl.Overlay>
+						<LayersControl.Overlay name="Stokes County, NC" checked={countyLayers.stokesNC.enabled}>
+							<FeatureGroup ref={stokesGroupRef as any}>
+								{isValidWms(countyLayers.stokesNC.url, countyLayers.stokesNC.layers) && (
+									<WMSTileLayer url={countyLayers.stokesNC.url} params={{ layers: countyLayers.stokesNC.layers, format: 'image/png', transparent: true }} opacity={0.7} />
+								)}
+							</FeatureGroup>
+						</LayersControl.Overlay>
+						<LayersControl.Overlay name="Surry County, NC" checked={countyLayers.surryNC.enabled}>
+							<FeatureGroup ref={surryGroupRef as any}>
+								{isValidWms(countyLayers.surryNC.url, countyLayers.surryNC.layers) && (
+									<WMSTileLayer url={countyLayers.surryNC.url} params={{ layers: countyLayers.surryNC.layers, format: 'image/png', transparent: true }} opacity={0.7} />
+								)}
+							</FeatureGroup>
+						</LayersControl.Overlay>
 					</LayersControl>
 
 					{coords && (
@@ -668,20 +755,6 @@ useEffect(() => {
                         </Marker>
                     ))}
                     <DrawingTools onChange={(polys) => setGeofenceRings(polys)} />
-
-					{/* County WMS Overlays */}
-					{countyLayers.patrickVA.enabled && isValidWms(countyLayers.patrickVA.url, countyLayers.patrickVA.layers) && (
-						<WMSTileLayer url={countyLayers.patrickVA.url} params={{ layers: countyLayers.patrickVA.layers, format: 'image/png', transparent: true }} opacity={0.7} />
-					)}
-					{countyLayers.henryVA.enabled && isValidWms(countyLayers.henryVA.url, countyLayers.henryVA.layers) && (
-						<WMSTileLayer url={countyLayers.henryVA.url} params={{ layers: countyLayers.henryVA.layers, format: 'image/png', transparent: true }} opacity={0.7} />
-					)}
-					{countyLayers.stokesNC.enabled && isValidWms(countyLayers.stokesNC.url, countyLayers.stokesNC.layers) && (
-						<WMSTileLayer url={countyLayers.stokesNC.url} params={{ layers: countyLayers.stokesNC.layers, format: 'image/png', transparent: true }} opacity={0.7} />
-					)}
-					{countyLayers.surryNC.enabled && isValidWms(countyLayers.surryNC.url, countyLayers.surryNC.layers) && (
-						<WMSTileLayer url={countyLayers.surryNC.url} params={{ layers: countyLayers.surryNC.layers, format: 'image/png', transparent: true }} opacity={0.7} />
-					)}
 
 				</MapContainer>
 			</div>

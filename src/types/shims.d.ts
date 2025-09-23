@@ -29,11 +29,33 @@ declare module "react-leaflet" {
   export const WMSTileLayer: any
   export const Polyline: any
   export const Tooltip: any
+  export const FeatureGroup: any
 }
 
 declare module "leaflet" {
   const L: any
   export = L
+}
+// Provide a global namespace for type positions like L.Map used in TSX
+declare namespace L {
+  type Map = any
+  type FeatureGroup = any
+  type LayerGroup = any
+  type LatLng = any
+}
+
+// Minimal React shim for environments lacking type resolution (with generics)
+declare module "react" {
+  export type DependencyList = ReadonlyArray<any>
+  export type EffectCallback = () => void | (() => void)
+  export type Dispatch<A> = (value: A) => void
+  export type SetStateAction<S> = S | ((prevState: S) => S)
+  export function useEffect(effect: EffectCallback, deps?: DependencyList): void
+  export function useMemo<T>(factory: () => T, deps: DependencyList): T
+  export function useRef<T>(initialValue: T | null): { current: T | null }
+  export function useState<S>(initialState: S | (() => S)): [S, Dispatch<SetStateAction<S>>]
+  const React: any
+  export default React
 }
 
 declare module "@turf/area" { const fn: any; export default fn }
