@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useRef, useState, lazy } from "react";
-import { Settings } from "lucide-react";
+import { Settings } from "@/components/icons";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { EstimatorTab } from "./tabs/EstimatorTab";

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Palette, Search, ShoppingCart, Plus, Ruler } from "lucide-react";
+import { Palette, Search, ShoppingCart, Plus, Ruler } from "@/components/icons";
 
 interface Stencil {
   id: string;

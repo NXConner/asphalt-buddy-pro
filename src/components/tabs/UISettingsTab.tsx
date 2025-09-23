@@ -11,10 +11,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { 
-  Palette, Upload, Volume2, Bell, Monitor, Sun, Moon, Zap, 
+  Palette, Upload, Volume2, Bell, Monitor, Sun, Moon, Zap,
   Image, Music, Download, Trash2, Play, Pause, Settings,
   Eye, Camera, Sparkles, RefreshCw, Save
-} from "lucide-react";
+} from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 
 interface ThemeSettings {

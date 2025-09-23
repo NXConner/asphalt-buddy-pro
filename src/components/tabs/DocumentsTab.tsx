@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { FolderOpen, Upload, Download, Eye, Trash2, Plus, FileText, Image, File } from "lucide-react";
+import { FolderOpen, Upload, Download, Eye, Trash2, Plus, FileText, Image, File } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 
 interface Document {

@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { User, Upload, Camera, Mail, Phone, MapPin, Building, Calendar, Save, Edit } from "lucide-react";
+import { User, Upload, Camera, Mail, Phone, MapPin, Building, Calendar, Save, Edit } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 
 interface UserProfile {
