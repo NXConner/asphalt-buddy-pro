@@ -14,6 +14,23 @@ import "leaflet-draw";
 
 type MapProvider = "osm" | "google" | "google_sat" | "esri" | "county";
 
+// Local helper to perform search with state handling
+async function performSearch(query: string, setSearching: (v: boolean) => void, setSearchError: (v: string | null) => void, setResults: (r: GeocodeResult[]) => void) {
+    try {
+        setSearchError(null);
+        setSearching(true);
+        const r = await searchAddress(query);
+        setResults(r);
+        if (r.length === 0) {
+            setSearchError("No results found.");
+        }
+    } catch (e: any) {
+        setSearchError("Search failed. Please try again.");
+    } finally {
+        setSearching(false);
+    }
+}
+
 export function OverwatchTab() {
 	const [provider, setProvider] = useState<MapProvider>("google_sat");
 	const [hasGeolocation, setHasGeolocation] = useState<boolean>(false);
@@ -25,6 +42,8 @@ export function OverwatchTab() {
 	const [map, setMap] = useState<L.Map | null>(null);
 	const [totals, setTotals] = useState<{ areaSqM: number; lengthM: number }>({ areaSqM: 0, lengthM: 0 });
 	const [radiusM, setRadiusM] = useState<number>(5000);
+	const [searching, setSearching] = useState<boolean>(false);
+	const [searchError, setSearchError] = useState<string | null>(null);
 const [radarFrames, setRadarFrames] = useState<string[]>([]);
 const [radarIdx, setRadarIdx] = useState<number>(0);
 const [radarPlaying, setRadarPlaying] = useState<boolean>(false);
@@ -243,6 +262,32 @@ useEffect(() => {
 		return null;
 	}
 
+	async function handleSearch() {
+		if (query.trim().length < 3) return;
+		await performSearch(query, setSearching, setSearchError, setResults);
+	}
+
+	// Fit to selected geocode result when chosen
+	useEffect(() => {
+		if (!map || !selectedResult) return;
+		try {
+			const lat = parseFloat(selectedResult.lat);
+			const lon = parseFloat(selectedResult.lon);
+			const bb = selectedResult.boundingbox;
+			if (bb && bb.length === 4) {
+				const south = parseFloat(bb[0]);
+				const north = parseFloat(bb[1]);
+				const west = parseFloat(bb[2]);
+				const east = parseFloat(bb[3]);
+				map.fitBounds([[south, west], [north, east]]);
+			} else if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
+				map.flyTo([lat, lon], 16, { duration: 0.6 });
+			}
+		} catch {
+			// ignore
+		}
+	}, [map, selectedResult?.lat, selectedResult?.lon, selectedResult?.boundingbox?.[0], selectedResult?.boundingbox?.[1], selectedResult?.boundingbox?.[2], selectedResult?.boundingbox?.[3]]);
+
  function DrawingTools({ onChange }: { onChange?: (polygons: [number, number][][]) => void }) {
 		const map = useMap();
 		const featureGroupRef = useRef<L.FeatureGroup | null>(null);
@@ -428,19 +473,35 @@ useEffect(() => {
 					type="text"
 					value={query}
 					onChange={(e) => setQuery(e.target.value)}
+					onKeyDown={(e) => {
+						if (e.key === "Enter") {
+							e.preventDefault();
+							void handleSearch();
+						}
+					}}
 					placeholder="Search address or place"
 					className="border rounded px-3 py-2 w-full sm:max-w-md"
 				/>
-                <button
-					onClick={async () => {
-						const r = await searchAddress(query);
-						setResults(r);
-					}}
-                  className="border rounded px-3 py-2 active:scale-95 transition-transform"
-				>
-					Search
-				</button>
+				<div className="flex gap-2">
+					<button
+						onClick={() => { void handleSearch(); }}
+						disabled={searching || query.trim().length < 3}
+						className="border rounded px-3 py-2 active:scale-95 transition-transform disabled:opacity-60"
+					>
+						{searching ? "Searching…" : "Search"}
+					</button>
+					<button
+						onClick={() => { setQuery(""); setResults([]); setSelectedResult(null); setSearchError(null); }}
+						disabled={searching && results.length === 0 && !selectedResult && query.length === 0}
+						className="border rounded px-3 py-2 active:scale-95 transition-transform disabled:opacity-60"
+					>
+						Clear
+					</button>
+				</div>
 			</div>
+			{searchError && (
+				<div className="text-sm text-red-500">{searchError}</div>
+			)}
 			{results.length > 0 && (
 				<div className="bg-card border rounded p-2 max-h-48 overflow-auto">
 					{results.map((r) => (
@@ -495,7 +556,9 @@ useEffect(() => {
 					)}
 
 					{selectedResult && (
-						<MapFlyTo lat={parseFloat(selectedResult.lat)} lon={parseFloat(selectedResult.lon)} />
+						<Marker position={[parseFloat(selectedResult.lat), parseFloat(selectedResult.lon)]}>
+							<Popup>{selectedResult.display_name}</Popup>
+						</Marker>
 					)}
 
 					{coords && <Circle center={[coords.lat, coords.lng]} radius={radiusM} pathOptions={{ color: "#3b82f6", weight: 1 }} />}
