@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useEffect, useRef } from "react";
+import { applyUITheme, listenForThemeChanges } from "@/lib/theme";
 import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
 import Index from "./pages/Index";
@@ -22,6 +23,16 @@ const App = () => {
   const lastSyncRef = useRef<number>(0);
 
   useEffect(() => {
+    // Apply persisted UI theme and subscribe to future updates
+    try {
+      const saved = localStorage.getItem('uiSettings');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.theme) applyUITheme(parsed.theme);
+      }
+      listenForThemeChanges();
+    } catch {}
+
     let BG: any = null;
 
     async function startWatcher() {
