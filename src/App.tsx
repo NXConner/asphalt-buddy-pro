@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import { useEffect, useRef } from "react";
 import { applyUITheme, listenForThemeChanges } from "@/lib/theme";
 import { Capacitor } from "@capacitor/core";
@@ -154,6 +154,12 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <div className="w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="max-w-6xl mx-auto px-4 py-2 flex items-center gap-4 text-sm">
+              <Link to="/" className="hover:underline">Home</Link>
+              <Link to="/overwatch" className="hover:underline">Overwatch</Link>
+            </div>
+          </div>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/overwatch" element={<Overwatch />} />

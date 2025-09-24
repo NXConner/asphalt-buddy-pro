@@ -61,12 +61,49 @@ const [tips, setTips] = useState<string[]>([]);
 const [etaObj, setEtaObj] = useState<{ nextStart?: Date; nextStop?: Date; currentIntensityMmPerH?: number }>({});
 const [alertsEnabled, setAlertsEnabled] = useState<boolean>(false);
 const [detectAbort, setDetectAbort] = useState<AbortController | null>(null);
-	const [countyLayers, setCountyLayers] = useState({
-		patrickVA: { label: "Patrick County, VA", enabled: false, url: "", layers: "", version: "1.3.0", styles: "" },
-		henryVA: { label: "Henry County, VA", enabled: false, url: "", layers: "", version: "1.3.0", styles: "" },
-		stokesNC: { label: "Stokes County, NC", enabled: false, url: "", layers: "", version: "1.3.0", styles: "" },
-		surryNC: { label: "Surry County, NC", enabled: false, url: "", layers: "", version: "1.3.0", styles: "" },
-	});
+    const [countyLayers, setCountyLayers] = useState(() => {
+        const defaults = {
+            patrickVA: {
+                label: "Patrick County, VA",
+                enabled: false,
+                url: (import.meta as any)?.env?.VITE_WMS_PATRICK_URL || "",
+                layers: (import.meta as any)?.env?.VITE_WMS_PATRICK_LAYERS || "",
+                version: (import.meta as any)?.env?.VITE_WMS_PATRICK_VERSION || "1.3.0",
+                styles: (import.meta as any)?.env?.VITE_WMS_PATRICK_STYLES || ""
+            },
+            henryVA: {
+                label: "Henry County, VA",
+                enabled: false,
+                url: (import.meta as any)?.env?.VITE_WMS_HENRY_URL || "",
+                layers: (import.meta as any)?.env?.VITE_WMS_HENRY_LAYERS || "",
+                version: (import.meta as any)?.env?.VITE_WMS_HENRY_VERSION || "1.3.0",
+                styles: (import.meta as any)?.env?.VITE_WMS_HENRY_STYLES || ""
+            },
+            stokesNC: {
+                label: "Stokes County, NC",
+                enabled: false,
+                url: (import.meta as any)?.env?.VITE_WMS_STOKES_URL || "",
+                layers: (import.meta as any)?.env?.VITE_WMS_STOKES_LAYERS || "",
+                version: (import.meta as any)?.env?.VITE_WMS_STOKES_VERSION || "1.3.0",
+                styles: (import.meta as any)?.env?.VITE_WMS_STOKES_STYLES || ""
+            },
+            surryNC: {
+                label: "Surry County, NC",
+                enabled: false,
+                url: (import.meta as any)?.env?.VITE_WMS_SURRY_URL || "",
+                layers: (import.meta as any)?.env?.VITE_WMS_SURRY_LAYERS || "",
+                version: (import.meta as any)?.env?.VITE_WMS_SURRY_VERSION || "1.3.0",
+                styles: (import.meta as any)?.env?.VITE_WMS_SURRY_STYLES || ""
+            }
+        };
+        // Auto-enable any with both url and layers set
+        return {
+            patrickVA: { ...defaults.patrickVA, enabled: /^https?:\/\//i.test(defaults.patrickVA.url) && defaults.patrickVA.layers.trim().length > 0 },
+            henryVA: { ...defaults.henryVA, enabled: /^https?:\/\//i.test(defaults.henryVA.url) && defaults.henryVA.layers.trim().length > 0 },
+            stokesNC: { ...defaults.stokesNC, enabled: /^https?:\/\//i.test(defaults.stokesNC.url) && defaults.stokesNC.layers.trim().length > 0 },
+            surryNC: { ...defaults.surryNC, enabled: /^https?:\/\//i.test(defaults.surryNC.url) && defaults.surryNC.layers.trim().length > 0 },
+        };
+    });
 	// LayerGroup refs for syncing with LayersControl and external checkboxes
 	const patrickGroupRef = useRef<L.FeatureGroup | null>(null);
 	const henryGroupRef = useRef<L.FeatureGroup | null>(null);
