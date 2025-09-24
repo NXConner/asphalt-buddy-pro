@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Overwatch from "./pages/Overwatch";
+import AiMap from "./pages/AiMap";
 
 const queryClient = new QueryClient();
 
@@ -188,11 +189,13 @@ const App = () => {
             <div className="max-w-6xl mx-auto px-4 py-2 flex items-center gap-4 text-sm">
               <Link to="/" className="hover:underline">Home</Link>
               <Link to="/overwatch" className="hover:underline">Overwatch</Link>
+              <Link to="/ai-map" className="hover:underline">AI Map</Link>
             </div>
           </div>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/overwatch" element={<Overwatch />} />
+            <Route path="/ai-map" element={<AiMap />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
