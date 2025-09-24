@@ -102,7 +102,7 @@ export function ComplianceTab() {
                     <Accordion type="multiple" className="w-full">
                       {section.items.map((item, itemIndex) => (
                         <AccordionItem key={itemIndex} value={`${section.id}-${itemIndex}`}>
-                          <AccordionTrigger className="text-left">
+                          <AccordionTrigger className="text-left" onClick={() => {}}>
                             {item.title}
                           </AccordionTrigger>
                           <AccordionContent>

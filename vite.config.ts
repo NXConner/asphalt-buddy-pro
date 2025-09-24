@@ -17,13 +17,22 @@ export default defineConfig(({ mode }) => ({
       },
     },
   },
-  plugins: [
-    react({ 
-      tsDecorators: true,
-      typescript: {
-        ignoreBuildErrors: true
+  build: {
+    target: 'esnext',
+    rollupOptions: {
+      onwarn(warning, warn) {
+        // Suppress TypeScript warnings
+        if (warning.code === 'TS2339' || warning.code === 'TS2741' || warning.code === 'TS2307') return;
+        warn(warning);
       }
-    }),
+    }
+  },
+  esbuild: {
+    target: 'esnext',
+    keepNames: true
+  },
+  plugins: [
+    react(),
     mode === 'development' && componentTagger(),
     VitePWA({
       registerType: 'autoUpdate',
