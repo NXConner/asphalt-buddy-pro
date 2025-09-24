@@ -117,7 +117,7 @@ server.post('/asphalt/detect', async (request, reply) => {
   const heightKm = Math.abs(north - south) * 111.32;
   const widthKm = Math.abs(east - west) * 111.32 * Math.cos(meanLat * Math.PI / 180);
   const areaKm2 = heightKm * widthKm;
-  if (!Number.isFinite(areaKm2) || areaKm2 <= 0) {
+  if (!isFinite(areaKm2) || areaKm2 <= 0) {
     return reply.code(400).send({ error: 'invalid_bbox', message: 'Unreasonable bounds' });
   }
   if (areaKm2 > 25) {

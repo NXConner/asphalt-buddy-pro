@@ -67,6 +67,25 @@ export const EstimatorTab = () => {
 
   const [calculation, setCalculation] = useState<CalculationResult | null>(null);
 
+  // Import measurements from Overwatch (if any)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('estimatorImport');
+      if (!raw) return;
+      const data = JSON.parse(raw) as Partial<EstimateData> & { sealcoating?: { area?: number }, asphaltPaving?: { area?: number } };
+      const areaSeal = Number(data?.sealcoating?.area ?? 0);
+      const areaAsph = Number(data?.asphaltPaving?.area ?? 0);
+      if (areaSeal > 0 || areaAsph > 0) {
+        setEstimate(prev => ({
+          ...prev,
+          sealcoating: { ...prev.sealcoating, area: areaSeal > 0 ? areaSeal : prev.sealcoating.area },
+          asphaltPaving: { ...prev.asphaltPaving, area: areaAsph > 0 ? areaAsph : prev.asphaltPaving.area }
+        }));
+      }
+      localStorage.removeItem('estimatorImport');
+    } catch {}
+  }, []);
+
   // Calculate area automatically when length or width changes
   useEffect(() => {
     const area = estimate.sealcoating.length * estimate.sealcoating.width;

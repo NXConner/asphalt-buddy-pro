@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // removed explicit React ref type import to avoid type export issues
 import { MapContainer, TileLayer, LayersControl, ScaleControl, ZoomControl, Marker, Popup, useMap, Circle, WMSTileLayer, Polyline, Tooltip, FeatureGroup } from "react-leaflet";
 import { fetchRainviewer, fetchForecast, computeRainEta, generateWeatherTips } from "@/lib/weather";
+import { detectAsphalt, computeBboxAreaKm2 } from "@/lib/asphalt";
 import { supabase } from "@/integrations/supabase/client";
 import { searchAddress, GeocodeResult } from "@/lib/geocode";
 import { useToast } from "@/components/ui/use-toast";
@@ -59,6 +60,7 @@ const [tips, setTips] = useState<string[]>([]);
 	const [lastSyncTs, setLastSyncTs] = useState<number | null>(null);
 const [etaObj, setEtaObj] = useState<{ nextStart?: Date; nextStop?: Date; currentIntensityMmPerH?: number }>({});
 const [alertsEnabled, setAlertsEnabled] = useState<boolean>(false);
+const [detectAbort, setDetectAbort] = useState<AbortController | null>(null);
 	const [countyLayers, setCountyLayers] = useState({
 		patrickVA: { label: "Patrick County, VA", enabled: false, url: "", layers: "", version: "1.3.0", styles: "" },
 		henryVA: { label: "Henry County, VA", enabled: false, url: "", layers: "", version: "1.3.0", styles: "" },
@@ -87,7 +89,7 @@ const [alertsEnabled, setAlertsEnabled] = useState<boolean>(false);
 			// ignore
 		}
 	}, []);
-
+    
 	useEffect(() => {
 		try {
 			localStorage.setItem('overwatch.countyLayers', JSON.stringify(countyLayers));
@@ -577,69 +579,53 @@ function DrawingTools({ onChange, groupRef }: { onChange?: (polygons: [number, n
 		try {
 			setDetecting(true);
 			const b = map.getBounds();
-			const south = b.getSouth();
-			const west = b.getWest();
-			const north = b.getNorth();
-			const east = b.getEast();
-			const query = `
-				[out:json][timeout:25];
-				(
-					way["surface"~"^(asphalt|paved)$"]["area"="yes"](${south},${west},${north},${east});
-					way["amenity"="parking"](${south},${west},${north},${east});
-					relation["amenity"="parking"](${south},${west},${north},${east});
-					way["landuse"~"^(retail|industrial|commercial)$"]["surface"~"^(asphalt|paved)$"](${south},${west},${north},${east});
-					relation["landuse"~"^(retail|industrial|commercial)$"]["surface"~"^(asphalt|paved)$"](${south},${west},${north},${east});
-				);
-				out body geom;`;
-			const res = await fetch("https://overpass-api.de/api/interpreter", {
-				method: "POST",
-				headers: { "Content-Type": "text/plain" },
-				body: query
-			});
-			if (!res.ok) throw new Error("Overpass query failed");
-			const data = await res.json();
-			const elements: any[] = data?.elements || [];
+			const bbox = { south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() };
+			const areaKm2 = computeBboxAreaKm2(bbox);
+			const zoom = map.getZoom();
+			if (areaKm2 > 25 || zoom < 15) {
+				toast({ title: "Zoom in further", description: "Please zoom in (area <= 25 km² and zoom >= 15)", variant: "destructive" });
+				setDetecting(false);
+				return;
+			}
+			const controller = new AbortController();
+			setDetectAbort(controller);
+			const result = await detectAsphalt(bbox, { includeParking: true, timeoutMs: 12000, signal: controller.signal });
 			let count = 0;
-			for (const el of elements) {
-				if (el.type === "way" && Array.isArray(el.geometry) && el.geometry.length >= 3) {
-					const latlngs = el.geometry.map((g: any) => L.latLng(g.lat, g.lon));
-					const poly = L.polygon(latlngs, { color: "#f59e0b", weight: 2, fillColor: "#f59e0b", fillOpacity: 0.25 });
+			const style = { color: "#f59e0b", weight: 3, fillColor: "#f59e0b", fillOpacity: 0.28 } as L.PathOptions & { fillColor?: string; fillOpacity?: number };
+			for (const ring of result.polygons) {
+				if (Array.isArray(ring) && ring.length >= 3) {
+					const latlngs = ring.map((g: any) => L.latLng(g.lat, g.lon));
+					const poly = L.polygon(latlngs, style);
 					poly.addTo(map);
 					(map as any).fire((L as any).Draw.Event.CREATED, { layer: poly });
 					count++;
-				} else if (el.type === "relation" && Array.isArray(el.members)) {
-					for (const m of el.members) {
-						if (m.role === "outer" && Array.isArray(m.geometry) && m.geometry.length >= 3) {
-							const latlngs = m.geometry.map((g: any) => L.latLng(g.lat, g.lon));
-							const poly = L.polygon(latlngs, { color: "#f59e0b", weight: 2, fillColor: "#f59e0b", fillOpacity: 0.25 });
-							poly.addTo(map);
-							(map as any).fire((L as any).Draw.Event.CREATED, { layer: poly });
-							count++;
-						}
-					}
 				}
 			}
 			if (count === 0) {
-				// Fallback: create a small rectangle near center as a hint
-				const center = map.getCenter();
-				function offset(lat: number, lng: number, dNorthM: number, dEastM: number) {
-					const dLat = dNorthM / 111320;
-					const dLng = dEastM / (111320 * Math.cos(lat * Math.PI / 180));
-					return L.latLng(lat + dLat, lng + dLng);
-				}
-				const a = offset(center.lat, center.lng, 25, -35);
-				const d = offset(center.lat, center.lng, -25, -35);
-				const c = offset(center.lat, center.lng, -25, 35);
-				const b = offset(center.lat, center.lng, 25, 35);
-				const poly = L.polygon([a, b, c, d], { color: "#f59e0b", weight: 2, fillColor: "#f59e0b", fillOpacity: 0.25 });
-				poly.addTo(map);
-				(map as any).fire((L as any).Draw.Event.CREATED, { layer: poly });
+				toast({ title: "No asphalt found", description: "Try adjusting the view or zooming in.", variant: "default" });
 			}
 		} catch (e) {
-			toast({ title: "AI Detect failed", description: "Overpass request failed. Try zooming in further or retry.", variant: "destructive" });
+			const msg = e instanceof Error ? e.message : 'Detection failed';
+			toast({ title: "Detect failed", description: msg, variant: "destructive" });
 		} finally {
 			setDetecting(false);
+			setDetectAbort(null);
 		}
+	}
+
+	function cancelDetect() {
+		try { detectAbort?.abort(); } catch {}
+		setDetecting(false);
+		setDetectAbort(null);
+	}
+
+	function exportToEstimator() {
+		const areaSqFt = totals.areaSqM * 10.7639;
+		try {
+			localStorage.setItem('estimatorImport', JSON.stringify({ sealcoating: { area: areaSqFt }, asphaltPaving: { area: areaSqFt } }));
+			window.dispatchEvent(new CustomEvent('navigate-tab', { detail: { tab: 'estimator' } }));
+			toast({ title: 'Exported to Estimator', description: `Area: ${areaSqFt.toFixed(0)} sq ft` });
+		} catch {}
 	}
 
 	function MapInstanceSetter({ onMap }: { onMap: (m: L.Map) => void }) {
@@ -938,7 +924,10 @@ function DrawingTools({ onChange, groupRef }: { onChange?: (polygons: [number, n
 						<li>Work-hours device usage monitoring</li>
 					</ul>
 					<div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-						<button className="border rounded px-3 py-2 active:scale-95 transition-transform" onClick={aiDetect} disabled={detecting}>{detecting ? "Detecting…" : "AI Detect Asphalt"}</button>
+					<button className="border rounded px-3 py-2 active:scale-95 transition-transform" onClick={aiDetect} disabled={detecting}>{detecting ? "Detecting…" : "AI Detect Asphalt"}</button>
+					{detecting && (
+						<button className="border rounded px-3 py-2 active:scale-95 transition-transform" onClick={cancelDetect}>Cancel</button>
+					)}
 						<button className="border rounded px-3 py-2 active:scale-95 transition-transform" onClick={() => { try { drawGroupRef.current?.clearLayers(); } catch {} setGeofenceRings([]); setTotals({ areaSqM: 0, lengthM: 0 }); }}>Clear Shapes</button>
 						<div className="flex items-center gap-2">
 							<label className="text-sm">Employee playback</label>
@@ -1012,6 +1001,10 @@ function DrawingTools({ onChange, groupRef }: { onChange?: (polygons: [number, n
 			<div className="rounded border p-3">
 				<h3 className="font-medium mb-2">Measurements</h3>
 				<div className="text-sm text-muted-foreground">Total area: {(totals.areaSqM / 4046.8564224).toFixed(2)} acres • Total perimeter: {totals.lengthM.toFixed(1)} m</div>
+				<div className="mt-2 flex items-center gap-2">
+					<button className="border rounded px-3 py-2 active:scale-95 transition-transform disabled:opacity-60" disabled={totals.areaSqM <= 0} onClick={exportToEstimator}>Export to Estimator</button>
+					<div className="text-xs text-muted-foreground">{(totals.areaSqM * 10.7639).toFixed(0)} sq ft</div>
+				</div>
 			</div>
 
 			<div className="rounded border p-3">
