@@ -40,6 +40,22 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
   const [smoothingTolerance, setSmoothingTolerance] = useState<number>(0);
   const [holeFillMeters, setHoleFillMeters] = useState<number>(0);
 
+  function resetControls() {
+    try {
+      setUnits('imperial');
+      setThickness(2);
+      setDensity(145);
+      setShowFill(true);
+      setShowOutline(true);
+      setShowHeat(false);
+      setBaseStyle('satellite');
+      setMinAreaInput(0);
+      setConfidenceThreshold(0.5);
+      setSmoothingTolerance(0);
+      setHoleFillMeters(0);
+    } catch {}
+  }
+
   const minAreaM2 = useMemo(() => {
     const val = Number(minAreaInput) || 0;
     return units === 'metric' ? val : val / 10.7639; // ft² -> m²
@@ -468,7 +484,19 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
         type: 'fill',
         source: 'asphalt-data',
         paint: {
-          'fill-color': '#ff6b35',
+          'fill-color': [
+            'interpolate',
+            ['linear'],
+            ['get', 'confidence'],
+            0,
+            '#fde68a',
+            0.5,
+            '#f59e0b',
+            0.8,
+            '#fb923c',
+            1,
+            '#ef4444',
+          ],
           'fill-opacity': 0.6,
           'fill-outline-color': '#ff4500',
         },
@@ -672,6 +700,9 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
                 ⬛ Clear Selection
               </Button>
             )}
+            <Button variant="outline" onClick={resetControls}>
+              Reset
+            </Button>
             <div className="flex items-center gap-2 ml-auto">
               <Label className="text-xs">Units</Label>
               <select
@@ -972,10 +1003,13 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
           <div className="font-medium">Legend</div>
           <div className="flex items-center gap-2">
             <span
-              className="inline-block w-3 h-3"
-              style={{ background: '#ff6b35', opacity: 0.6 }}
+              className="inline-block w-16 h-2 rounded"
+              style={{
+                background:
+                  'linear-gradient(90deg, #fde68a 0%, #f59e0b 50%, #fb923c 80%, #ef4444 100%)',
+              }}
             ></span>
-            <span>Detections</span>
+            <span>Fill (low → high confidence)</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="inline-block w-3 h-3 border" style={{ borderColor: '#ff4500' }}></span>
