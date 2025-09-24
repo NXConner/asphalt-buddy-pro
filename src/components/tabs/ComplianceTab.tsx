@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/simple-accordion";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/simple-card";
+import { Badge } from "@/components/ui/simple-badge";
+import { SimpleAccordion as Accordion, SimpleAccordionContent as AccordionContent, SimpleAccordionItem as AccordionItem, SimpleAccordionTrigger as AccordionTrigger } from "@/components/ui/simple-accordion";
 
 type RegionKey = 'general' | 'va' | 'nc';
 

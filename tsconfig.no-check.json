@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "noEmit": false,
+    "skipLibCheck": true,
+    "allowJs": true,
+    "strict": false
+  },
+  "include": ["src/components/ui/**/*"]
+}

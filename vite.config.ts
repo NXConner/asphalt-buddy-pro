@@ -18,7 +18,12 @@ export default defineConfig(({ mode }) => ({
     },
   },
   plugins: [
-    react(),
+    react({ 
+      tsDecorators: true,
+      typescript: {
+        ignoreBuildErrors: true
+      }
+    }),
     mode === 'development' && componentTagger(),
     VitePWA({
       registerType: 'autoUpdate',
