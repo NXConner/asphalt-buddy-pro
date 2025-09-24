@@ -502,7 +502,6 @@ const AsphaltMap: React.FC<AsphaltMapProps> = () => {
       const src = map.current.getSource('selection-rect-src') as any;
       if (src && src.setData) src.setData({ type: 'FeatureCollection', features: [] } as any);
     }
->>>>>>> origin/main
 
     map.current.on('mousedown', (e: any) => {
       if (e.originalEvent.shiftKey) {
