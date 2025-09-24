@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { detectAsphalt, type Bbox, type DetectResponse } from '@/lib/asphalt';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,7 +24,7 @@ interface AsphaltMapProps {
 
 const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
+  const map = useRef<any>(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const [detectionResults, setDetectionResults] = useState<DetectResponse | null>(null);
   const [selectedBbox, setSelectedBbox] = useState<Bbox | null>(null);
@@ -34,7 +36,7 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
   const [showFill, setShowFill] = useState<boolean>(true);
   const [showOutline, setShowOutline] = useState<boolean>(true);
   const [showHeat, setShowHeat] = useState<boolean>(false);
-  const [baseStyle, setBaseStyle] = useState<'satellite' | 'streets'>('satellite');
+  const [baseStyle, setBaseStyle] = useState<'satellite' | 'streets' | 'osm' | 'esri'>('satellite');
   const [minAreaInput, setMinAreaInput] = useState<number>(0); // displayed in current unit system
   const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.5);
   const [smoothingTolerance, setSmoothingTolerance] = useState<number>(0);
@@ -395,25 +397,60 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
 
   // Initialize map
   useEffect(() => {
-    if (!mapContainer.current || (!mapboxToken && !tokenInput)) return;
+    if (!mapContainer.current) return;
 
-    const token = mapboxToken || tokenInput;
-    if (!token) return;
-
-    mapboxgl.accessToken = token;
-    const styleUri =
-      baseStyle === 'satellite'
-        ? 'mapbox://styles/mapbox/satellite-v9'
-        : 'mapbox://styles/mapbox/streets-v12';
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: styleUri,
-      center: [-74.006, 40.7128], // NYC
-      zoom: 15,
-    });
+    const isMapbox = baseStyle === 'satellite' || baseStyle === 'streets';
+    if (isMapbox) {
+      const token = mapboxToken || tokenInput;
+      if (!token) return;
+      (mapboxgl as any).accessToken = token;
+      const styleUri = baseStyle === 'satellite' ? 'mapbox://styles/mapbox/satellite-v9' : 'mapbox://styles/mapbox/streets-v12';
+      map.current = new (mapboxgl as any).Map({
+        container: mapContainer.current,
+        style: styleUri,
+        center: [-74.006, 40.7128],
+        zoom: 15,
+      });
+    } else {
+      // MapLibre with free raster sources
+      const rasterTiles = baseStyle === 'osm'
+        ? {
+            tiles: ['https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            attribution: '© OpenStreetMap contributors',
+          }
+        : {
+            tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+            attribution: 'Tiles © Esri',
+          };
+      const style = {
+        version: 8,
+        sources: {
+          base: {
+            type: 'raster',
+            tiles: rasterTiles.tiles,
+            tileSize: 256,
+            attribution: rasterTiles.attribution,
+          },
+        },
+        layers: [
+          {
+            id: 'base',
+            type: 'raster',
+            source: 'base',
+          },
+        ],
+      } as any;
+      map.current = new (maplibregl as any).Map({
+        container: mapContainer.current,
+        style,
+        center: [-74.006, 40.7128],
+        zoom: 15,
+      });
+    }
 
     // Add navigation controls
-    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    const engine: any = (baseStyle === 'satellite' || baseStyle === 'streets') ? mapboxgl : maplibregl;
+    map.current.addControl(new engine.NavigationControl(), 'top-right');
 
     // Add drawing capabilities for area selection (with visual rectangle)
     let isDrawing = false;
@@ -421,7 +458,7 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
     let previewId = 'selection-preview';
     let previewLayerId = 'selection-preview-layer';
 
-    map.current.on('mousedown', (e) => {
+    map.current.on('mousedown', (e: any) => {
       if (e.originalEvent.shiftKey) {
         isDrawing = true;
         startPoint = e.lngLat;
@@ -429,7 +466,7 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
       }
     });
 
-    map.current.on('mousemove', (e) => {
+    map.current.on('mousemove', (e: any) => {
       if (!isDrawing || !startPoint) return;
       const endPoint = e.lngLat;
       const west = Math.min(startPoint.lng, endPoint.lng);
@@ -453,7 +490,7 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
       }
     });
 
-    map.current.on('mouseup', (e) => {
+    map.current.on('mouseup', (e: any) => {
       if (!isDrawing || !startPoint) return;
 
       isDrawing = false;
@@ -649,7 +686,8 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
           units === 'metric'
             ? `<div style="font-family: ui-sans-serif, system-ui; font-size:12px"><div><b>Area</b>: ${aM2.toFixed(0)} m²</div><div><b>Volume</b>: ${vol.toFixed(2)} m³</div><div><b>Tonnage</b>: ${tons.toFixed(1)} t</div><div><b>Confidence</b>: ${(conf * 100).toFixed(0)}%</div></div>`
             : `<div style="font-family: ui-sans-serif, system-ui; font-size:12px"><div><b>Area</b>: ${(aM2 * 10.7639).toFixed(0)} ft²</div><div><b>Volume</b>: ${vol.toFixed(0)} ft³</div><div><b>Tonnage</b>: ${tons.toFixed(1)} tons</div><div><b>Confidence</b>: ${(conf * 100).toFixed(0)}%</div></div>`;
-        new mapboxgl.Popup({ closeButton: false })
+        const engine: any = (baseStyle === 'satellite' || baseStyle === 'streets') ? mapboxgl : maplibregl;
+        new engine.Popup({ closeButton: false })
           .setLngLat(e.lngLat)
           .setHTML(content)
           .addTo(map.current!);
@@ -714,7 +752,8 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
     }
   };
 
-  if (!mapboxToken && !tokenInput) {
+  const isMapboxBase = baseStyle === 'satellite' || baseStyle === 'streets';
+  if (isMapboxBase && !mapboxToken && !tokenInput) {
     return (
       <Card className="w-full max-w-md mx-auto">
         <CardHeader>
@@ -796,11 +835,13 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
               <Label className="text-xs ml-2">Base</Label>
               <select
                 value={baseStyle}
-                onChange={(e) => setBaseStyle(e.target.value as 'satellite' | 'streets')}
+                onChange={(e) => setBaseStyle(e.target.value as 'satellite' | 'streets' | 'osm' | 'esri')}
                 className="border rounded px-2 py-1 bg-background text-xs"
               >
                 <option value="satellite">Satellite</option>
                 <option value="streets">Streets</option>
+                <option value="osm">OpenStreetMap (free)</option>
+                <option value="esri">ESRI Imagery (free)</option>
               </select>
             </div>
           </div>
