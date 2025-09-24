@@ -13,6 +13,8 @@ import { polygon as turfPolygon } from '@turf/helpers';
 import jsPDF from 'jspdf';
 import intersect from '@turf/intersect';
 import centroid from '@turf/centroid';
+import simplify from '@turf/simplify';
+import buffer from '@turf/buffer';
 
 interface AsphaltMapProps {
   mapboxToken?: string;
@@ -35,6 +37,8 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
   const [baseStyle, setBaseStyle] = useState<'satellite' | 'streets'>('satellite');
   const [minAreaInput, setMinAreaInput] = useState<number>(0); // displayed in current unit system
   const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.5);
+  const [smoothingTolerance, setSmoothingTolerance] = useState<number>(0);
+  const [holeFillMeters, setHoleFillMeters] = useState<number>(0);
 
   const minAreaM2 = useMemo(() => {
     const val = Number(minAreaInput) || 0;
@@ -209,16 +213,15 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
 
   function exportCSV() {
     if (!detectionResults) return;
-    const header = ['id', 'area_m2', 'area_primary', 'area_secondary'];
+    const header = ['id', 'area_m2', 'confidence', 'area_primary', 'area_secondary'];
     const lines = [header.join(',')];
-    detectionResults.polygons.forEach((poly, idx) => {
+    const src: any = (map.current?.getSource('asphalt-data') as any)?.serialize?.()?.data;
+    const feats: any[] = src?.features || [];
+    feats.forEach((feat: any) => {
       try {
-        const ring = poly.map((p) => [p.lon, p.lat] as [number, number]);
-        const first = ring[0];
-        const last = ring[ring.length - 1];
-        if (first && (first[0] !== last[0] || first[1] !== last[1]))
-          ring.push([first[0], first[1]]);
-        const aM2 = area(turfPolygon([ring]));
+        const id = Number(feat.properties?.id) || 0;
+        const aM2 = Number(feat.properties?.area_m2) || 0;
+        const conf = Number(feat.properties?.confidence) || 0;
         let prim = '';
         let sec = '';
         if (units === 'metric') {
@@ -230,7 +233,7 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
           prim = `${sqft.toFixed(0)} sq ft`;
           sec = `${acres.toFixed(2)} acres`;
         }
-        lines.push([idx, aM2.toFixed(2), prim, sec].join(','));
+        lines.push([id, aM2.toFixed(2), conf.toFixed(2), prim, sec].join(','));
       } catch {}
     });
     // Totals row
@@ -406,31 +409,45 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
       map.current.removeSource('asphalt-heat-src');
     }
 
-    // Add detected asphalt polygons (apply min area filter)
+    // Add detected asphalt polygons (apply min area filter, optional smoothing/hole fill)
     const geojsonData = {
       type: 'FeatureCollection' as const,
       features: detectionResults.polygons
         .map((polygon, index) => {
-          const coords = polygon.map((point) => [point.lon, point.lat] as [number, number]);
-          // ensure closed ring for area calc
-          const ring = [...coords];
+          const baseCoords = polygon.map((point) => [point.lon, point.lat] as [number, number]);
+          let ring = [...baseCoords];
           if (ring.length > 0) {
             const f = ring[0];
             const l = ring[ring.length - 1];
             if (f[0] !== l[0] || f[1] !== l[1]) ring.push([f[0], f[1]]);
           }
+          let geom = turfPolygon([ring]);
+          try {
+            if (smoothingTolerance > 0) {
+              const tolDeg = smoothingTolerance * 1e-5;
+              geom = simplify(geom as any, { tolerance: tolDeg, highQuality: true }) as any;
+            }
+            if (holeFillMeters > 0) {
+              const bufKm = holeFillMeters / 1000;
+              const grown = buffer(geom as any, bufKm, { units: 'kilometers' }) as any;
+              const shrunk = buffer(grown as any, -bufKm, { units: 'kilometers' }) as any;
+              if (shrunk) geom = shrunk as any;
+            }
+          } catch {}
           const aM2 = (() => {
             try {
-              return area(turfPolygon([ring]));
+              return area(geom as any);
             } catch {
               return 0;
             }
           })();
+          const outCoords =
+            ((geom as any)?.geometry?.coordinates?.[0] as [number, number][]) || baseCoords;
           const confidence = 1.0;
           return {
             type: 'Feature' as const,
             properties: { id: index, area_m2: aM2, confidence },
-            geometry: { type: 'Polygon' as const, coordinates: [coords] },
+            geometry: { type: 'Polygon' as const, coordinates: [outCoords] },
           };
         })
         .filter(
@@ -519,10 +536,11 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
           const pounds = vol * (density || 0);
           return pounds / 2000;
         })();
+        const conf = Number(f?.properties?.confidence) || 0;
         const content =
           units === 'metric'
-            ? `<div style="font-family: ui-sans-serif, system-ui; font-size:12px"><div><b>Area</b>: ${aM2.toFixed(0)} m²</div><div><b>Volume</b>: ${vol.toFixed(2)} m³</div><div><b>Tonnage</b>: ${tons.toFixed(1)} t</div></div>`
-            : `<div style="font-family: ui-sans-serif, system-ui; font-size:12px"><div><b>Area</b>: ${(aM2 * 10.7639).toFixed(0)} ft²</div><div><b>Volume</b>: ${vol.toFixed(0)} ft³</div><div><b>Tonnage</b>: ${tons.toFixed(1)} tons</div></div>`;
+            ? `<div style="font-family: ui-sans-serif, system-ui; font-size:12px"><div><b>Area</b>: ${aM2.toFixed(0)} m²</div><div><b>Volume</b>: ${vol.toFixed(2)} m³</div><div><b>Tonnage</b>: ${tons.toFixed(1)} t</div><div><b>Confidence</b>: ${(conf * 100).toFixed(0)}%</div></div>`
+            : `<div style="font-family: ui-sans-serif, system-ui; font-size:12px"><div><b>Area</b>: ${(aM2 * 10.7639).toFixed(0)} ft²</div><div><b>Volume</b>: ${vol.toFixed(0)} ft³</div><div><b>Tonnage</b>: ${tons.toFixed(1)} tons</div><div><b>Confidence</b>: ${(conf * 100).toFixed(0)}%</div></div>`;
         new mapboxgl.Popup({ closeButton: false })
           .setLngLat(e.lngLat)
           .setHTML(content)
@@ -805,6 +823,26 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
                         ? `${computedMaterials.tonnage.toFixed(1)} t`
                         : `${computedMaterials.tonnage.toFixed(1)} tons`}
                     </span>
+                  </div>
+                </div>
+                <div className="col-span-2 grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Smoothing (tolerance, m)</Label>
+                    <Input
+                      type="number"
+                      value={smoothingTolerance}
+                      onChange={(e) => setSmoothingTolerance(parseFloat(e.target.value) || 0)}
+                      className="h-8"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Hole fill (closing, m)</Label>
+                    <Input
+                      type="number"
+                      value={holeFillMeters}
+                      onChange={(e) => setHoleFillMeters(parseFloat(e.target.value) || 0)}
+                      className="h-8"
+                    />
                   </div>
                 </div>
                 <div className="col-span-2 mt-2 flex flex-wrap gap-2">
