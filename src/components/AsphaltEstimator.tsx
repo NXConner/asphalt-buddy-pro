@@ -144,6 +144,11 @@ const AsphaltEstimator = () => {
         {/* Header */}
         <div className="text-center space-y-2">
           <h1 className="text-4xl font-bold text-primary">Asphalt Cost Estimator</h1>
+          <div className="text-sm">
+            <a href="/overwatch" className="underline text-primary">
+              Open OverWatch Operational Map
+            </a>
+          </div>
           <p className="text-muted-foreground">
             Professional asphalt project estimation and planning
           </p>
