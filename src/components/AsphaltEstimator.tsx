@@ -1,205 +1,323 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Settings } from "@/components/icons";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { EstimatorTab } from "./tabs/EstimatorTab";
-const OverwatchTab = React.lazy(() => import("./tabs/OverwatchTab").then(m => ({ default: m.OverwatchTab })));
-import { SettingsTab } from "./tabs/SettingsTab";
-import { CustomersTab } from "./tabs/CustomersTab";
-import { InvoicesTab } from "./tabs/InvoicesTab";
-import { JobCostingTab } from "./tabs/JobCostingTab";
-import { DocumentsTab } from "./tabs/DocumentsTab";
-import { StencilCatalogTab } from "./tabs/StencilCatalogTab";
-import { PremiumServicesTab } from "./tabs/PremiumServicesTab";
-import { BestPracticesTab } from "./tabs/BestPracticesTab";
-import ChecklistTab from "./tabs/ChecklistTab";
-import { ComplianceTab } from "./tabs/ComplianceTab";
-import { ProfileTab } from "./tabs/ProfileTab";
-import { UISettingsTab } from "./tabs/UISettingsTab";
-import { DraggableCalculator } from "./tabs/DraggableCalculator";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calculator, DollarSign, TrendingUp, FileText, Settings, Save } from "@/components/icons";
+import { useToast } from "@/hooks/use-toast";
 
 const AsphaltEstimator = () => {
-  const [activeTab, setActiveTab] = useState("estimator");
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showCalculator, setShowCalculator] = useState(false);
-  const tabsListRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+  const [measurements, setMeasurements] = useState({
+    length: "",
+    width: "",
+    thickness: ""
+  });
 
-  const scrollTabs = (direction: 'left' | 'right') => {
-    if (tabsListRef.current) {
-      const scrollAmount = 200;
-      const currentScroll = tabsListRef.current.scrollLeft;
-      tabsListRef.current.scrollTo({
-        left: direction === 'left' ? currentScroll - scrollAmount : currentScroll + scrollAmount,
-        behavior: 'smooth'
-      });
-    }
+  const [costs, setCosts] = useState({
+    materialCost: 0,
+    laborCost: 0,
+    equipmentCost: 0,
+    totalCost: 0,
+    profitMargin: 15
+  });
+
+  const [estimateData, setEstimateData] = useState({
+    area: 0,
+    volume: 0,
+    tonnage: 0
+  });
+
+  // Calculate estimates when measurements change
+  useEffect(() => {
+    const length = parseFloat(measurements.length) || 0;
+    const width = parseFloat(measurements.width) || 0;
+    const thickness = parseFloat(measurements.thickness) || 0;
+
+    const area = length * width; // square feet
+    const volume = (area * thickness) / 12; // cubic feet (thickness in inches)
+    const tonnage = volume * 145 / 2000; // approximate weight in tons
+
+    setEstimateData({ area, volume, tonnage });
+
+    // Calculate costs
+    const materialCost = tonnage * 120; // $120 per ton base cost
+    const laborCost = area * 2.5; // $2.50 per sq ft labor
+    const equipmentCost = Math.max(500, area * 0.75); // minimum $500 or $0.75/sq ft
+    const subtotal = materialCost + laborCost + equipmentCost;
+    const totalCost = subtotal * (1 + costs.profitMargin / 100);
+
+    setCosts(prev => ({
+      ...prev,
+      materialCost,
+      laborCost,
+      equipmentCost,
+      totalCost
+    }));
+  }, [measurements, costs.profitMargin]);
+
+  const handleInputChange = (field: string, value: string) => {
+    setMeasurements(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === 'F11') {
-        e.preventDefault();
-        setIsFullscreen(!isFullscreen);
-      }
-      if (e.key === 'c' && e.ctrlKey) {
-        e.preventDefault();
-        setShowCalculator(!showCalculator);
-      }
-    };
+  const saveEstimate = () => {
+    toast({
+      title: "Estimate Saved",
+      description: "Your asphalt estimate has been saved successfully.",
+    });
+  };
 
-    window.addEventListener('keydown', handleKeyPress);
-    const navHandler = (e: Event) => {
-      const detail = (e as CustomEvent).detail as { tab?: string } | undefined;
-      if (detail?.tab) setActiveTab(detail.tab);
+  const exportEstimate = () => {
+    const data = {
+      measurements,
+      estimateData,
+      costs,
+      timestamp: new Date().toISOString()
     };
-    window.addEventListener('navigate-tab', navHandler as EventListener);
-    return () => {
-      window.removeEventListener('keydown', handleKeyPress);
-      window.removeEventListener('navigate-tab', navHandler as EventListener);
-    };
-  }, [isFullscreen, showCalculator]);
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `asphalt-estimate-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Estimate Exported",
+      description: "Your estimate has been downloaded as a JSON file.",
+    });
+  };
 
   return (
-    <div className={`min-h-screen bg-gradient-to-br from-background via-primary/5 to-secondary/10 ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}>
-      <div className="container mx-auto p-4 h-full">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-primary mb-2">Asphalt Estimator Pro</h1>
-            <p className="text-muted-foreground">Comprehensive asphalt maintenance and estimation tools</p>
-          </div>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setShowCalculator(!showCalculator)}
-              className="hidden md:flex"
-            >
-              🧮 Calculator
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setIsFullscreen(!isFullscreen)}
-            >
-              {isFullscreen ? '⤴' : '⤢'} {isFullscreen ? 'Exit' : 'Fullscreen'}
-            </Button>
-          </div>
+    <div className="min-h-screen bg-background p-4">
+      <div className="max-w-6xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="text-center space-y-2">
+          <h1 className="text-4xl font-bold text-primary">Asphalt Cost Estimator</h1>
+          <p className="text-muted-foreground">Professional asphalt project estimation and planning</p>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="relative mb-6">
-            <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12 gap-1 h-auto p-1">
-              <TabsTrigger value="checklist" className="flex items-center gap-2">
-                📋 Checklist
-              </TabsTrigger>
-              <TabsTrigger value="estimator" className="flex items-center gap-2">
-                🧮 Estimator
-              </TabsTrigger>
-              <TabsTrigger value="overwatch" className="flex items-center gap-2">
-                📊 Overwatch
-              </TabsTrigger>
-              <TabsTrigger value="settings" className="flex items-center gap-2">
-                <Settings className="h-4 w-4" />
-                Settings
-              </TabsTrigger>
-              <TabsTrigger value="customers" className="flex items-center gap-2">
-                👥 Customers
-              </TabsTrigger>
-              <TabsTrigger value="invoices" className="flex items-center gap-2">
-                📄 Invoices
-              </TabsTrigger>
-              <TabsTrigger value="job-costing" className="flex items-center gap-2">
-                💰 Job Costing
-              </TabsTrigger>
-              <TabsTrigger value="documents" className="flex items-center gap-2">
-                📁 Documents
-              </TabsTrigger>
-              <TabsTrigger value="stencil-catalog" className="flex items-center gap-2">
-                🎯 Stencils
-              </TabsTrigger>
-              <TabsTrigger value="premium-services" className="flex items-center gap-2">
-                ✨ Premium
-              </TabsTrigger>
-              <TabsTrigger value="best-practices" className="flex items-center gap-2">
-                📚 Best Practices
-              </TabsTrigger>
-              <TabsTrigger value="compliance" className="flex items-center gap-2">
-                🛡️ Compliance
-              </TabsTrigger>
-              <TabsTrigger value="profile" className="flex items-center gap-2">
-                👤 Profile
-              </TabsTrigger>
-              <TabsTrigger value="ui-settings" className="flex items-center gap-2">
-                🎨 UI Settings
-              </TabsTrigger>
-            </TabsList>
-          </div>
+        <Tabs defaultValue="calculator" className="space-y-6">
+          <TabsList className="grid grid-cols-4 w-full max-w-md mx-auto">
+            <TabsTrigger value="calculator" className="flex items-center gap-2">
+              <Calculator className="w-4 h-4" />
+              Calculator
+            </TabsTrigger>
+            <TabsTrigger value="estimates" className="flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              Estimates
+            </TabsTrigger>
+            <TabsTrigger value="reports" className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4" />
+              Reports
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center gap-2">
+              <Settings className="w-4 h-4" />
+              Settings
+            </TabsTrigger>
+          </TabsList>
 
-          <div className="min-h-[600px]">
-            <TabsContent value="checklist">
-              <ChecklistTab />
-            </TabsContent>
+          {/* Calculator Tab */}
+          <TabsContent value="calculator" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Input Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calculator className="w-5 h-5" />
+                    Project Measurements
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="length">Length (ft)</Label>
+                      <Input
+                        id="length"
+                        type="number"
+                        value={measurements.length}
+                        onChange={(e) => handleInputChange("length", e.target.value)}
+                        placeholder="Enter length"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="width">Width (ft)</Label>
+                      <Input
+                        id="width"
+                        type="number"
+                        value={measurements.width}
+                        onChange={(e) => handleInputChange("width", e.target.value)}
+                        placeholder="Enter width"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="thickness">Thickness (inches)</Label>
+                    <Input
+                      id="thickness"
+                      type="number"
+                      value={measurements.thickness}
+                      onChange={(e) => handleInputChange("thickness", e.target.value)}
+                      placeholder="Enter thickness"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="profit">Profit Margin (%)</Label>
+                    <Input
+                      id="profit"
+                      type="number"
+                      value={costs.profitMargin}
+                      onChange={(e) => setCosts(prev => ({ ...prev, profitMargin: parseFloat(e.target.value) || 0 }))}
+                      placeholder="Enter profit margin"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
 
-            <TabsContent value="estimator">
-              <EstimatorTab />
-            </TabsContent>
+              {/* Results Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <DollarSign className="w-5 h-5" />
+                    Cost Breakdown
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span>Area:</span>
+                        <Badge variant="secondary">{estimateData.area.toFixed(0)} sq ft</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Volume:</span>
+                        <Badge variant="secondary">{estimateData.volume.toFixed(1)} cu ft</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Tonnage:</span>
+                        <Badge variant="secondary">{estimateData.tonnage.toFixed(1)} tons</Badge>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span>Materials:</span>
+                        <span>${costs.materialCost.toFixed(0)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Labor:</span>
+                        <span>${costs.laborCost.toFixed(0)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Equipment:</span>
+                        <span>${costs.equipmentCost.toFixed(0)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="border-t pt-4">
+                    <div className="flex justify-between text-lg font-semibold">
+                      <span>Total Cost:</span>
+                      <span className="text-primary">${costs.totalCost.toFixed(0)}</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={saveEstimate} className="flex items-center gap-2 flex-1">
+                      <Save className="w-4 h-4" />
+                      Save Estimate
+                    </Button>
+                    <Button onClick={exportEstimate} variant="outline" className="flex items-center gap-2 flex-1">
+                      <FileText className="w-4 h-4" />
+                      Export
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
 
-            <TabsContent value="overwatch">
-              <React.Suspense fallback={<div>Loading Overwatch...</div>}>
-                <OverwatchTab />
-              </React.Suspense>
-            </TabsContent>
+          {/* Estimates Tab */}
+          <TabsContent value="estimates">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Saved Estimates
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center text-muted-foreground py-8">
+                  <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No saved estimates yet</p>
+                  <p className="text-sm">Create your first estimate using the calculator</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-            <TabsContent value="settings">
-              <SettingsTab />
-            </TabsContent>
+          {/* Reports Tab */}
+          <TabsContent value="reports">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  Project Reports
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center text-muted-foreground py-8">
+                  <TrendingUp className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No reports available</p>
+                  <p className="text-sm">Complete some estimates to generate reports</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-            <TabsContent value="customers">
-              <CustomersTab />
-            </TabsContent>
-
-            <TabsContent value="invoices">
-              <InvoicesTab />
-            </TabsContent>
-
-            <TabsContent value="job-costing">
-              <JobCostingTab />
-            </TabsContent>
-
-            <TabsContent value="documents">
-              <DocumentsTab />
-            </TabsContent>
-
-            <TabsContent value="stencil-catalog">
-              <StencilCatalogTab />
-            </TabsContent>
-
-            <TabsContent value="premium-services">
-              <PremiumServicesTab />
-            </TabsContent>
-
-            <TabsContent value="best-practices">
-              <BestPracticesTab />
-            </TabsContent>
-
-            <TabsContent value="compliance">
-              <ComplianceTab />
-            </TabsContent>
-
-            <TabsContent value="profile">
-              <ProfileTab />
-            </TabsContent>
-
-            <TabsContent value="ui-settings">
-              <UISettingsTab />
-            </TabsContent>
-          </div>
+          {/* Settings Tab */}
+          <TabsContent value="settings">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="w-5 h-5" />
+                  Application Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-medium mb-2">Cost Parameters</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label>Material Cost (per ton)</Label>
+                        <Input defaultValue="120" type="number" />
+                      </div>
+                      <div>
+                        <Label>Labor Rate (per sq ft)</Label>
+                        <Input defaultValue="2.50" type="number" step="0.01" />
+                      </div>
+                      <div>
+                        <Label>Equipment Rate (per sq ft)</Label>
+                        <Input defaultValue="0.75" type="number" step="0.01" />
+                      </div>
+                      <div>
+                        <Label>Default Profit Margin (%)</Label>
+                        <Input defaultValue="15" type="number" />
+                      </div>
+                    </div>
+                  </div>
+                  <Button>Save Settings</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
-
-        <DraggableCalculator 
-          isOpen={showCalculator} 
-          onClose={() => setShowCalculator(false)} 
-        />
       </div>
     </div>
   );
