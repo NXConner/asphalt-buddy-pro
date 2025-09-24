@@ -56,6 +56,61 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
     } catch {}
   }
 
+  // Load persisted settings
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('aiMapSettings:v1');
+      if (!raw) return;
+      const s = JSON.parse(raw);
+      if (s && typeof s === 'object') {
+        if (s.units === 'imperial' || s.units === 'metric') setUnits(s.units);
+        if (typeof s.thickness === 'number') setThickness(s.thickness);
+        if (typeof s.density === 'number') setDensity(s.density);
+        if (typeof s.showFill === 'boolean') setShowFill(s.showFill);
+        if (typeof s.showOutline === 'boolean') setShowOutline(s.showOutline);
+        if (typeof s.showHeat === 'boolean') setShowHeat(s.showHeat);
+        if (s.baseStyle === 'satellite' || s.baseStyle === 'streets') setBaseStyle(s.baseStyle);
+        if (typeof s.minAreaInput === 'number') setMinAreaInput(s.minAreaInput);
+        if (typeof s.confidenceThreshold === 'number')
+          setConfidenceThreshold(s.confidenceThreshold);
+        if (typeof s.smoothingTolerance === 'number') setSmoothingTolerance(s.smoothingTolerance);
+        if (typeof s.holeFillMeters === 'number') setHoleFillMeters(s.holeFillMeters);
+      }
+    } catch {}
+  }, []);
+
+  // Persist settings on change
+  useEffect(() => {
+    try {
+      const payload = {
+        units,
+        thickness,
+        density,
+        showFill,
+        showOutline,
+        showHeat,
+        baseStyle,
+        minAreaInput,
+        confidenceThreshold,
+        smoothingTolerance,
+        holeFillMeters,
+      };
+      localStorage.setItem('aiMapSettings:v1', JSON.stringify(payload));
+    } catch {}
+  }, [
+    units,
+    thickness,
+    density,
+    showFill,
+    showOutline,
+    showHeat,
+    baseStyle,
+    minAreaInput,
+    confidenceThreshold,
+    smoothingTolerance,
+    holeFillMeters,
+  ]);
+
   const minAreaM2 = useMemo(() => {
     const val = Number(minAreaInput) || 0;
     return units === 'metric' ? val : val / 10.7639; // ft² -> m²
