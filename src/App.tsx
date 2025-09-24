@@ -1,8 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
-import AsphaltEstimator from "@/components/AsphaltEstimator";
-import AsphaltMap from "@/components/AsphaltMap";
 
 const queryClient = new QueryClient();
 
@@ -20,20 +18,21 @@ const App = () => {
           </div>
           <Routes>
             <Route path="/" element={
-              <div className="max-w-6xl mx-auto p-4">
-                <AsphaltEstimator />
+              <div className="max-w-6xl mx-auto p-8">
+                <h1 className="text-4xl font-bold mb-4">Welcome to Asphalt Estimator</h1>
+                <p className="text-lg text-muted-foreground">Professional asphalt business estimator and operational map.</p>
               </div>
             } />
             <Route path="/overwatch" element={
               <div className="p-8">
                 <h1 className="text-2xl font-bold mb-4">Overwatch</h1>
-                <AsphaltMap />
+                <p className="text-muted-foreground">Operational map and tracking functionality coming soon...</p>
               </div>
             } />
             <Route path="/ai-map" element={
               <div className="p-8">
                 <h1 className="text-2xl font-bold mb-4">AI Map</h1>
-                <AsphaltMap />
+                <p className="text-muted-foreground">AI-powered mapping features coming soon...</p>
               </div>
             } />
             <Route path="*" element={<div className="p-8"><h1 className="text-2xl font-bold">Page Not Found</h1></div>} />
