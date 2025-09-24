@@ -5,8 +5,9 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calculator, DollarSign, TrendingUp, FileText, Settings, Save } from "@/components/icons";
+import { Calculator, DollarSign, TrendingUp, FileText, Settings, Save, MapPin } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
+import AsphaltMap from "./AsphaltMap";
 
 const AsphaltEstimator = () => {
   const { toast } = useToast();
@@ -105,8 +106,12 @@ const AsphaltEstimator = () => {
           <p className="text-muted-foreground">Professional asphalt project estimation and planning</p>
         </div>
 
-        <Tabs defaultValue="calculator" className="space-y-6">
-          <TabsList className="grid grid-cols-4 w-full max-w-md mx-auto">
+        <Tabs defaultValue="detection" className="space-y-6">
+          <TabsList className="grid grid-cols-5 w-full max-w-2xl mx-auto">
+            <TabsTrigger value="detection" className="flex items-center gap-2">
+              <MapPin className="w-4 h-4" />
+              AI Detection
+            </TabsTrigger>
             <TabsTrigger value="calculator" className="flex items-center gap-2">
               <Calculator className="w-4 h-4" />
               Calculator
@@ -124,6 +129,11 @@ const AsphaltEstimator = () => {
               Settings
             </TabsTrigger>
           </TabsList>
+
+          {/* AI Detection Tab */}
+          <TabsContent value="detection" className="space-y-6">
+            <AsphaltMap />
+          </TabsContent>
 
           {/* Calculator Tab */}
           <TabsContent value="calculator" className="space-y-6">
