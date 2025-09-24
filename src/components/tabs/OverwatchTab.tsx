@@ -591,7 +591,7 @@ function DrawingTools({ onChange, groupRef }: { onChange?: (polygons: [number, n
 			setDetectAbort(controller);
 			const result = await detectAsphalt(bbox, { includeParking: true, timeoutMs: 12000, signal: controller.signal });
 			let count = 0;
-			const style = { color: "#f59e0b", weight: 3, fillColor: "#f59e0b", fillOpacity: 0.28 } as L.PathOptions & { fillColor?: string; fillOpacity?: number };
+			const style = { color: "#f59e0b", weight: 3, fillColor: "#f59e0b", fillOpacity: 0.28 } as any;
 			for (const ring of result.polygons) {
 				if (Array.isArray(ring) && ring.length >= 3) {
 					const latlngs = ring.map((g: any) => L.latLng(g.lat, g.lon));
