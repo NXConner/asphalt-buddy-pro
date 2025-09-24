@@ -1,8 +1,8 @@
 import { createRoot } from "react-dom/client";
-import TestApp from "./test-app.tsx";
+import App from "./App.tsx";
 import "./index.css";
 
-createRoot(document.getElementById("root")!).render(<TestApp />);
+createRoot(document.getElementById("root")!).render(<App />);
 
 // Register PWA service worker when available
 if ("serviceWorker" in navigator) {
