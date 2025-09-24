@@ -11,6 +11,7 @@ import { MapPin, Search } from '@/components/icons';
 import area from '@turf/area';
 import { polygon as turfPolygon } from '@turf/helpers';
 import jsPDF from 'jspdf';
+import intersect from '@turf/intersect';
 import centroid from '@turf/centroid';
 
 interface AsphaltMapProps {
@@ -33,6 +34,7 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
   const [showHeat, setShowHeat] = useState<boolean>(false);
   const [baseStyle, setBaseStyle] = useState<'satellite' | 'streets'>('satellite');
   const [minAreaInput, setMinAreaInput] = useState<number>(0); // displayed in current unit system
+  const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.5);
 
   const minAreaM2 = useMemo(() => {
     const val = Number(minAreaInput) || 0;
@@ -424,13 +426,18 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
               return 0;
             }
           })();
+          const confidence = 1.0;
           return {
             type: 'Feature' as const,
-            properties: { id: index, area_m2: aM2 },
+            properties: { id: index, area_m2: aM2, confidence },
             geometry: { type: 'Polygon' as const, coordinates: [coords] },
           };
         })
-        .filter((f) => (Number(f.properties.area_m2) || 0) >= minAreaM2),
+        .filter(
+          (f) =>
+            (Number(f.properties.area_m2) || 0) >= minAreaM2 &&
+            (Number(f.properties.confidence) || 0) >= confidenceThreshold,
+        ),
     };
 
     map.current.addSource('asphalt-data', {
@@ -467,15 +474,17 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
       try {
         const features = {
           type: 'FeatureCollection' as const,
-          features: detectionResults.polygons.map((poly) => {
-            const ring: [number, number][] = poly.map((p) => [p.lon, p.lat]);
+          features: geojsonData.features.map((feat: any) => {
+            const coords: [number, number][] = feat.geometry.coordinates?.[0] || [];
+            const ring: [number, number][] = coords.map((c) => [c[0], c[1]]);
             if (ring.length > 0) {
               const f = ring[0];
               const l = ring[ring.length - 1];
               if (f[0] !== l[0] || f[1] !== l[1]) ring.push([f[0], f[1]]);
             }
             const c = centroid(turfPolygon([ring]));
-            return { type: 'Feature' as const, properties: { weight: 1 }, geometry: c.geometry };
+            const weight = Number(feat.properties?.confidence) || 1;
+            return { type: 'Feature' as const, properties: { weight }, geometry: c.geometry };
           }),
         };
         map.current.addSource('asphalt-heat-src', { type: 'geojson', data: features as any });
@@ -486,6 +495,7 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
           paint: {
             'heatmap-radius': 20,
             'heatmap-opacity': 0.5,
+            'heatmap-weight': ['get', 'weight'],
           },
         });
       } catch {}
@@ -536,7 +546,17 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
           map.current.off('click', 'asphalt-outline', clickHandler);
       } catch {}
     };
-  }, [detectionResults, showFill, showOutline, showHeat, minAreaM2, units, thickness, density]);
+  }, [
+    detectionResults,
+    showFill,
+    showOutline,
+    showHeat,
+    minAreaM2,
+    units,
+    thickness,
+    density,
+    confidenceThreshold,
+  ]);
 
   const handleDetectAsphalt = async () => {
     if (!selectedBbox) {
@@ -713,6 +733,30 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
                   <span>Heatmap</span>
                 </label>
               </div>
+              <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-4 text-sm items-end">
+                <div className="space-y-1">
+                  <Label className="text-xs">Min Area ({units === 'metric' ? 'm²' : 'ft²'})</Label>
+                  <Input
+                    type="number"
+                    value={minAreaInput}
+                    onChange={(e) => setMinAreaInput(parseFloat(e.target.value) || 0)}
+                    className="h-8"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">
+                    Confidence ≥ {Math.round(confidenceThreshold * 100)}%
+                  </Label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={confidenceThreshold}
+                    onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value))}
+                  />
+                </div>
+              </div>
               <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
                 <div className="space-y-1">
                   <Label className="text-xs">Min Area ({units === 'metric' ? 'm²' : 'ft²'})</Label>
@@ -802,6 +846,75 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
                   >
                     Export to Estimator
                   </Button>
+                </div>
+                {/* Validation panel: upload ground truth GeoJSON */}
+                <div className="col-span-2 mt-4 border-t pt-4">
+                  <h5 className="font-medium mb-2 text-sm">Validation</h5>
+                  <input
+                    type="file"
+                    accept="application/geo+json,application/json,.geojson,.json"
+                    onChange={async (e) => {
+                      try {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const text = await file.text();
+                        const truth = JSON.parse(text);
+                        // Build detected union area (approx by summing areas; IoU here uses area sums)
+                        const detectedM2 =
+                          (map.current?.getSource('asphalt-data') as any)
+                            ?.serialize?.()
+                            ?.data?.features?.reduce?.(
+                              (sum: number, f: any) => sum + (Number(f.properties?.area_m2) || 0),
+                              0,
+                            ) ?? areaTotals.totalM2;
+                        // Ground truth area
+                        let truthM2 = 0;
+                        try {
+                          const feats: any[] = truth?.features || [];
+                          for (const f of feats) {
+                            if (
+                              f?.geometry?.type === 'Polygon' ||
+                              f?.geometry?.type === 'MultiPolygon'
+                            ) {
+                              truthM2 += area(f);
+                            }
+                          }
+                        } catch {}
+                        // Intersection area approx: sum intersections per detected polygon
+                        let interM2 = 0;
+                        try {
+                          const detected: any[] =
+                            (map.current?.getSource('asphalt-data') as any)?.serialize?.()?.data
+                              ?.features || [];
+                          const truths: any[] = truth?.features || [];
+                          for (const d of detected) {
+                            for (const t of truths) {
+                              const g = intersect(d as any, t as any);
+                              if (g) interM2 += area(g as any);
+                            }
+                          }
+                        } catch {}
+                        const unionM2 = detectedM2 + truthM2 - interM2;
+                        const iou = unionM2 > 0 ? interM2 / unionM2 : 0;
+                        const precision = detectedM2 > 0 ? interM2 / detectedM2 : 0;
+                        const recall = truthM2 > 0 ? interM2 / truthM2 : 0;
+                        const f1 =
+                          precision + recall > 0
+                            ? (2 * precision * recall) / (precision + recall)
+                            : 0;
+                        toast({
+                          title: 'Validation computed',
+                          description: `IoU ${(iou * 100).toFixed(1)}% • P ${(precision * 100).toFixed(1)}% • R ${(recall * 100).toFixed(1)}% • F1 ${(f1 * 100).toFixed(1)}%`,
+                        });
+                      } catch (err) {
+                        toast({
+                          title: 'Validation failed',
+                          description: err instanceof Error ? err.message : 'Invalid file',
+                          variant: 'destructive',
+                        });
+                      }
+                    }}
+                  />
                 </div>
               </div>
             </div>
