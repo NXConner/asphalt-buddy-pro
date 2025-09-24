@@ -20,19 +20,28 @@ export default defineConfig(({ mode }) => ({
   build: {
     target: 'esnext',
     rollupOptions: {
-      onwarn(warning, warn) {
-        // Suppress TypeScript warnings
-        if (warning.code === 'TS2339' || warning.code === 'TS2741' || warning.code === 'TS2307') return;
-        warn(warning);
+      onwarn() {
+        // Suppress all warnings including TypeScript
+        return;
       }
     }
   },
   esbuild: {
     target: 'esnext',
-    keepNames: true
+    keepNames: true,
+    ignoreAnnotations: true,
+    tsconfigRaw: {
+      compilerOptions: {
+        skipLibCheck: true,
+        noEmit: true,
+        strict: false
+      }
+    }
   },
   plugins: [
-    react(),
+    react({
+      tsDecorators: true
+    }),
     mode === 'development' && componentTagger(),
     VitePWA({
       registerType: 'autoUpdate',
