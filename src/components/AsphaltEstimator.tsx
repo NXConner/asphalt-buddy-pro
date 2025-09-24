@@ -15,6 +15,9 @@ import {
   MapPin,
 } from '@/components/icons';
 import { useToast } from '@/hooks/use-toast';
+import { projectStorage } from '@/lib/storage';
+import { formatCurrency, formatNumber } from '@/lib/utils';
+import { ReportGenerator, generateDefaultReport, downloadReport } from '@/lib/reports';
 import AsphaltMap from './AsphaltMap';
 
 const AsphaltEstimator = () => {
@@ -108,9 +111,28 @@ const AsphaltEstimator = () => {
   };
 
   const saveEstimate = () => {
+    const estimate = {
+      id: Date.now().toString(),
+      projectName: `Project ${new Date().toLocaleDateString()}`,
+      location: 'Current Location',
+      measurements: {
+        ...estimateData,
+        thickness: parseFloat(measurements.thickness) || 0,
+      },
+      costs: {
+        materials: costs.materialCost,
+        labor: costs.laborCost,
+        equipment: costs.equipmentCost,
+        total: costs.totalCost,
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    projectStorage.saveEstimate(estimate);
     toast({
       title: 'Estimate Saved',
-      description: 'Your asphalt estimate has been saved successfully.',
+      description: 'Your asphalt estimate has been saved to local storage.',
     });
   };
 
@@ -180,7 +202,7 @@ const AsphaltEstimator = () => {
 
           {/* AI Detection Tab */}
           <TabsContent value="detection" className="space-y-6">
-            <AsphaltMap mapboxToken={(import.meta as any)?.env?.VITE_MAPBOX_TOKEN as string | undefined} />
+            <AsphaltMap />
           </TabsContent>
 
           {/* Calculator Tab */}

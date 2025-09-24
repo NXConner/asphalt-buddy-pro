@@ -1,6 +1,5 @@
 /* Leaflet CSS (must come before Tailwind directives) */
 @import "leaflet/dist/leaflet.css";
-@import "leaflet-draw/dist/leaflet.draw.css";
 
 @tailwind base;
 @tailwind components;
@@ -9,14 +8,14 @@
 /* Professional Asphalt Business Design System */
 @layer base {
   :root {
-    /* Core asphalt-inspired color palette */
-    --background: 45 6% 13%;
+    /* Core asphalt-inspired color palette - Dark theme by default */
+    --background: 0 0% 0%;
     --foreground: 45 15% 94%;
 
-    --card: 45 8% 16%;
+    --card: 0 0% 4%;
     --card-foreground: 45 15% 94%;
 
-    --popover: 45 8% 16%;
+    --popover: 0 0% 5%;
     --popover-foreground: 45 15% 94%;
 
     /* Asphalt blue primary color for professionalism */

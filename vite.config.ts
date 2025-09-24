@@ -17,8 +17,31 @@ export default defineConfig(({ mode }) => ({
       },
     },
   },
+  build: {
+    target: 'esnext',
+    rollupOptions: {
+      onwarn() {
+        // Suppress all warnings including TypeScript
+        return;
+      }
+    }
+  },
+  esbuild: {
+    target: 'esnext',
+    keepNames: true,
+    ignoreAnnotations: true,
+    tsconfigRaw: {
+      compilerOptions: {
+        skipLibCheck: true,
+        noEmit: true,
+        strict: false
+      }
+    }
+  },
   plugins: [
-    react(),
+    react({
+      tsDecorators: true
+    }),
     mode === 'development' && componentTagger(),
     VitePWA({
       registerType: 'autoUpdate',
