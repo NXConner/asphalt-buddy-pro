@@ -1,6 +1,5 @@
 /* Leaflet CSS (must come before Tailwind directives) */
 @import "leaflet/dist/leaflet.css";
-@import "leaflet-draw/dist/leaflet.draw.css";
 
 @tailwind base;
 @tailwind components;
