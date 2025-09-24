@@ -180,7 +180,7 @@ const AsphaltEstimator = () => {
 
           {/* AI Detection Tab */}
           <TabsContent value="detection" className="space-y-6">
-            <AsphaltMap />
+            <AsphaltMap mapboxToken={(import.meta as any)?.env?.VITE_MAPBOX_TOKEN as string | undefined} />
           </TabsContent>
 
           {/* Calculator Tab */}

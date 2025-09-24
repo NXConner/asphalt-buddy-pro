@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { detectAsphalt, type Bbox, type DetectResponse } from '@/lib/asphalt';
@@ -31,7 +33,7 @@ const AsphaltMap: React.FC<AsphaltMapProps> = () => {
   const [showFill, setShowFill] = useState<boolean>(true);
   const [showOutline, setShowOutline] = useState<boolean>(true);
   const [showHeat, setShowHeat] = useState<boolean>(false);
-  const [baseStyle, setBaseStyle] = useState<'satellite' | 'streets'>('satellite');
+  const [baseStyle, setBaseStyle] = useState<'satellite' | 'streets' | 'osm' | 'esri'>('satellite');
   const [minAreaInput, setMinAreaInput] = useState<number>(0); // displayed in current unit system
   const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.5);
   const [smoothingTolerance, setSmoothingTolerance] = useState<number>(0);
@@ -391,7 +393,7 @@ const AsphaltMap: React.FC<AsphaltMapProps> = () => {
   }
 
   // Build free raster styles for MapLibre (no token required)
-  function buildStyle(base: 'satellite' | 'streets') {
+  function buildStyle(base: 'satellite' | 'streets' | 'osm' | 'esri') {
     if (base === 'satellite') {
       return {
         version: 8,
@@ -437,7 +439,7 @@ const AsphaltMap: React.FC<AsphaltMapProps> = () => {
     // Add navigation controls
     map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
 
-    // Add drawing capabilities for area selection
+    // Add drawing capabilities for area selection (with visual rectangle)
     let isDrawing = false;
     let startPoint: any | null = null;
 
@@ -500,8 +502,9 @@ const AsphaltMap: React.FC<AsphaltMapProps> = () => {
       const src = map.current.getSource('selection-rect-src') as any;
       if (src && src.setData) src.setData({ type: 'FeatureCollection', features: [] } as any);
     }
+>>>>>>> origin/main
 
-    map.current.on('mousedown', (e) => {
+    map.current.on('mousedown', (e: any) => {
       if (e.originalEvent.shiftKey) {
         isDrawing = true;
         startPoint = e.lngLat;
@@ -510,12 +513,12 @@ const AsphaltMap: React.FC<AsphaltMapProps> = () => {
       }
     });
 
-    map.current.on('mousemove', (e) => {
+    map.current.on('mousemove', (e: any) => {
       if (!isDrawing || !startPoint) return;
       updateSelectionRect(startPoint, e.lngLat);
     });
 
-    map.current.on('mouseup', (e) => {
+    map.current.on('mouseup', (e: any) => {
       if (!isDrawing || !startPoint) return;
 
       isDrawing = false;
@@ -829,11 +832,13 @@ const AsphaltMap: React.FC<AsphaltMapProps> = () => {
               <Label className="text-xs ml-2">Base</Label>
               <select
                 value={baseStyle}
-                onChange={(e) => setBaseStyle(e.target.value as 'satellite' | 'streets')}
+                onChange={(e) => setBaseStyle(e.target.value as 'satellite' | 'streets' | 'osm' | 'esri')}
                 className="border rounded px-2 py-1 bg-background text-xs"
               >
                 <option value="satellite">Satellite</option>
                 <option value="streets">Streets</option>
+                <option value="osm">OpenStreetMap (free)</option>
+                <option value="esri">ESRI Imagery (free)</option>
               </select>
             </div>
           </div>
