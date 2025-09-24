@@ -415,9 +415,11 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
     // Add navigation controls
     map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
-    // Add drawing capabilities for area selection
+    // Add drawing capabilities for area selection (with visual rectangle)
     let isDrawing = false;
     let startPoint: mapboxgl.LngLat | null = null;
+    let previewId = 'selection-preview';
+    let previewLayerId = 'selection-preview-layer';
 
     map.current.on('mousedown', (e) => {
       if (e.originalEvent.shiftKey) {
@@ -429,8 +431,26 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
 
     map.current.on('mousemove', (e) => {
       if (!isDrawing || !startPoint) return;
+      const endPoint = e.lngLat;
+      const west = Math.min(startPoint.lng, endPoint.lng);
+      const east = Math.max(startPoint.lng, endPoint.lng);
+      const south = Math.min(startPoint.lat, endPoint.lat);
+      const north = Math.max(startPoint.lat, endPoint.lat);
 
-      // Update selection rectangle visual feedback could go here
+      const rect: [number, number][] = [
+        [west, south],
+        [east, south],
+        [east, north],
+        [west, north],
+        [west, south],
+      ];
+      const data = { type: 'FeatureCollection' as const, features: [{ type: 'Feature' as const, properties: {}, geometry: { type: 'Polygon' as const, coordinates: [rect] } }] };
+      if (!map.current!.getSource(previewId)) {
+        map.current!.addSource(previewId, { type: 'geojson', data } as any);
+        map.current!.addLayer({ id: previewLayerId, type: 'fill', source: previewId, paint: { 'fill-color': '#3b82f6', 'fill-opacity': 0.15, 'fill-outline-color': '#3b82f6' } });
+      } else {
+        (map.current!.getSource(previewId) as any).setData(data);
+      }
     });
 
     map.current.on('mouseup', (e) => {
@@ -447,6 +467,11 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
         east: Math.max(startPoint.lng, endPoint.lng),
       };
 
+      // Remove preview rectangle after selection
+      try {
+        if (map.current!.getLayer(previewLayerId)) map.current!.removeLayer(previewLayerId);
+        if (map.current!.getSource(previewId)) map.current!.removeSource(previewId);
+      } catch {}
       setSelectedBbox(bbox);
       toast({
         title: 'Area Selected',
