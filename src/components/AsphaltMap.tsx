@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { detectAsphalt, type Bbox, type DetectResponse } from '@/lib/asphalt';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { MapPin, Search } from '@/components/icons';
+import { Search } from '@/components/icons';
 import area from '@turf/area';
 import { polygon as turfPolygon } from '@turf/helpers';
 import jsPDF from 'jspdf';
@@ -16,17 +16,14 @@ import centroid from '@turf/centroid';
 import simplify from '@turf/simplify';
 import buffer from '@turf/buffer';
 
-interface AsphaltMapProps {
-  mapboxToken?: string;
-}
+interface AsphaltMapProps {}
 
-const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
+const AsphaltMap: React.FC<AsphaltMapProps> = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
+  const map = useRef<any | null>(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const [detectionResults, setDetectionResults] = useState<DetectResponse | null>(null);
   const [selectedBbox, setSelectedBbox] = useState<Bbox | null>(null);
-  const [tokenInput, setTokenInput] = useState('');
   const { toast } = useToast();
   const [units, setUnits] = useState<'imperial' | 'metric'>('imperial');
   const [thickness, setThickness] = useState<number>(2); // in inches (imperial) or centimeters (metric)
@@ -393,44 +390,129 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
     doc.save(`asphalt-report-${new Date().toISOString().split('T')[0]}.pdf`);
   }
 
+  // Build free raster styles for MapLibre (no token required)
+  function buildStyle(base: 'satellite' | 'streets') {
+    if (base === 'satellite') {
+      return {
+        version: 8,
+        sources: {
+          esri: {
+            type: 'raster',
+            tiles: [
+              'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            ],
+            tileSize: 256,
+            attribution: 'Tiles © Esri',
+          },
+        },
+        layers: [{ id: 'esri', type: 'raster', source: 'esri' }],
+      } as any;
+    }
+    return {
+      version: 8,
+      sources: {
+        osm: {
+          type: 'raster',
+          tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+          tileSize: 256,
+          attribution: '© OpenStreetMap contributors',
+        },
+      },
+      layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
+    } as any;
+  }
+
   // Initialize map
   useEffect(() => {
-    if (!mapContainer.current || (!mapboxToken && !tokenInput)) return;
+    if (!mapContainer.current) return;
 
-    const token = mapboxToken || tokenInput;
-    if (!token) return;
-
-    mapboxgl.accessToken = token;
-    const styleUri =
-      baseStyle === 'satellite'
-        ? 'mapbox://styles/mapbox/satellite-v9'
-        : 'mapbox://styles/mapbox/streets-v12';
-    map.current = new mapboxgl.Map({
+    const styleObj = buildStyle(baseStyle);
+    map.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: styleUri,
+      style: styleObj as any,
       center: [-74.006, 40.7128], // NYC
       zoom: 15,
     });
 
     // Add navigation controls
-    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
 
     // Add drawing capabilities for area selection
     let isDrawing = false;
-    let startPoint: mapboxgl.LngLat | null = null;
+    let startPoint: any | null = null;
+
+    function ensureSelectionLayers() {
+      if (!map.current) return;
+      if (!map.current.getSource('selection-rect-src')) {
+        map.current.addSource('selection-rect-src', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        } as any);
+      }
+      if (!map.current.getLayer('selection-rect-fill')) {
+        map.current.addLayer({
+          id: 'selection-rect-fill',
+          type: 'fill',
+          source: 'selection-rect-src',
+          paint: { 'fill-color': '#3b82f6', 'fill-opacity': 0.15 },
+        });
+      }
+      if (!map.current.getLayer('selection-rect-line')) {
+        map.current.addLayer({
+          id: 'selection-rect-line',
+          type: 'line',
+          source: 'selection-rect-src',
+          paint: { 'line-color': '#3b82f6', 'line-width': 2, 'line-dasharray': [2, 2] },
+        });
+      }
+    }
+
+    function updateSelectionRect(a: any, b: any) {
+      if (!map.current) return;
+      ensureSelectionLayers();
+      const west = Math.min(a.lng, b.lng);
+      const east = Math.max(a.lng, b.lng);
+      const south = Math.min(a.lat, b.lat);
+      const north = Math.max(a.lat, b.lat);
+      const ring: [number, number][] = [
+        [west, south],
+        [east, south],
+        [east, north],
+        [west, north],
+        [west, south],
+      ];
+      const gj = {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: {},
+            geometry: { type: 'Polygon', coordinates: [ring] },
+          },
+        ],
+      } as any;
+      const src = map.current.getSource('selection-rect-src') as any;
+      if (src && src.setData) src.setData(gj);
+    }
+
+    function clearSelectionRect() {
+      if (!map.current) return;
+      const src = map.current.getSource('selection-rect-src') as any;
+      if (src && src.setData) src.setData({ type: 'FeatureCollection', features: [] } as any);
+    }
 
     map.current.on('mousedown', (e) => {
       if (e.originalEvent.shiftKey) {
         isDrawing = true;
         startPoint = e.lngLat;
         map.current!.getCanvas().style.cursor = 'crosshair';
+        clearSelectionRect();
       }
     });
 
     map.current.on('mousemove', (e) => {
       if (!isDrawing || !startPoint) return;
-
-      // Update selection rectangle visual feedback could go here
+      updateSelectionRect(startPoint, e.lngLat);
     });
 
     map.current.on('mouseup', (e) => {
@@ -448,6 +530,7 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
       };
 
       setSelectedBbox(bbox);
+      updateSelectionRect(startPoint, endPoint);
       toast({
         title: 'Area Selected',
         description: "Click 'Detect Asphalt' to analyze this area.",
@@ -457,7 +540,16 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
     return () => {
       map.current?.remove();
     };
-  }, [mapboxToken, tokenInput, baseStyle]);
+  }, [baseStyle]);
+
+  // Clear selection rectangle when selection is cleared
+  useEffect(() => {
+    if (!map.current) return;
+    if (!selectedBbox) {
+      const src = map.current.getSource('selection-rect-src') as any;
+      if (src && src.setData) src.setData({ type: 'FeatureCollection', features: [] } as any);
+    }
+  }, [selectedBbox]);
 
   // Add detection results to map
   useEffect(() => {
@@ -624,7 +716,7 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
           units === 'metric'
             ? `<div style="font-family: ui-sans-serif, system-ui; font-size:12px"><div><b>Area</b>: ${aM2.toFixed(0)} m²</div><div><b>Volume</b>: ${vol.toFixed(2)} m³</div><div><b>Tonnage</b>: ${tons.toFixed(1)} t</div><div><b>Confidence</b>: ${(conf * 100).toFixed(0)}%</div></div>`
             : `<div style="font-family: ui-sans-serif, system-ui; font-size:12px"><div><b>Area</b>: ${(aM2 * 10.7639).toFixed(0)} ft²</div><div><b>Volume</b>: ${vol.toFixed(0)} ft³</div><div><b>Tonnage</b>: ${tons.toFixed(1)} tons</div><div><b>Confidence</b>: ${(conf * 100).toFixed(0)}%</div></div>`;
-        new mapboxgl.Popup({ closeButton: false })
+        new maplibregl.Popup({ closeButton: false })
           .setLngLat(e.lngLat)
           .setHTML(content)
           .addTo(map.current!);
@@ -689,41 +781,7 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
     }
   };
 
-  if (!mapboxToken && !tokenInput) {
-    return (
-      <Card className="w-full max-w-md mx-auto">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="w-5 h-5" />
-            Mapbox Token Required
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="token">Enter your Mapbox public token</Label>
-            <Input
-              id="token"
-              type="password"
-              value={tokenInput}
-              onChange={(e) => setTokenInput(e.target.value)}
-              placeholder="pk.eyJ1..."
-            />
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Get your token from{' '}
-            <a
-              href="https://mapbox.com/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:underline"
-            >
-              mapbox.com
-            </a>
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
+  // Free map: no token gating
 
   return (
     <div className="w-full space-y-4">
