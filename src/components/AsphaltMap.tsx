@@ -502,7 +502,6 @@ const AsphaltMap: React.FC<AsphaltMapProps> = () => {
       const src = map.current.getSource('selection-rect-src') as any;
       if (src && src.setData) src.setData({ type: 'FeatureCollection', features: [] } as any);
     }
->>>>>>> origin/main
 
     map.current.on('mousedown', (e: any) => {
       if (e.originalEvent.shiftKey) {
@@ -832,7 +831,9 @@ const AsphaltMap: React.FC<AsphaltMapProps> = () => {
               <Label className="text-xs ml-2">Base</Label>
               <select
                 value={baseStyle}
-                onChange={(e) => setBaseStyle(e.target.value as 'satellite' | 'streets' | 'osm' | 'esri')}
+                onChange={(e) =>
+                  setBaseStyle(e.target.value as 'satellite' | 'streets' | 'osm' | 'esri')
+                }
                 className="border rounded px-2 py-1 bg-background text-xs"
               >
                 <option value="satellite">Satellite</option>
