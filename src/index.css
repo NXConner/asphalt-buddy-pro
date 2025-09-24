@@ -8,15 +8,15 @@
 /* Professional Asphalt Business Design System */
 @layer base {
   :root {
-    /* Core asphalt-inspired color palette */
-    --background: 45 6% 13%;
-    --foreground: 45 15% 94%;
+    /* Core asphalt-inspired color palette - Light theme by default */
+    --background: 0 0% 98%;
+    --foreground: 45 8% 15%;
 
-    --card: 45 8% 16%;
-    --card-foreground: 45 15% 94%;
+    --card: 0 0% 100%;
+    --card-foreground: 45 8% 15%;
 
-    --popover: 45 8% 16%;
-    --popover-foreground: 45 15% 94%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 45 8% 15%;
 
     /* Asphalt blue primary color for professionalism */
     --primary: 214 76% 52%;
@@ -28,8 +28,8 @@
     --secondary-foreground: 0 0% 100%;
 
     /* Muted grays for balance */
-    --muted: 45 8% 22%;
-    --muted-foreground: 45 8% 65%;
+    --muted: 45 8% 96%;
+    --muted-foreground: 45 8% 45%;
 
     /* Construction accent colors */
     --accent: 25 95% 53%;
@@ -38,8 +38,8 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 45 8% 22%;
-    --input: 45 8% 18%;
+    --border: 45 8% 88%;
+    --input: 45 8% 92%;
     --ring: 214 76% 52%;
 
     --radius: 0.75rem;
