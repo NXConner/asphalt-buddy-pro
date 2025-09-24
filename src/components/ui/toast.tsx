@@ -1,6 +1,20 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
+export interface ToastActionElement {
+  altText?: string;
+}
+
+export interface ToastProps {
+  id?: string;
+  title?: React.ReactNode;
+  description?: React.ReactNode;
+  action?: ToastActionElement;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  variant?: "default" | "destructive";
+}
+
 const Toast = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement> & ToastProps
@@ -67,19 +81,5 @@ const ToastClose = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttribute
   )
 );
 ToastClose.displayName = "ToastClose";
-
-export interface ToastActionElement {
-  altText?: string;
-}
-
-export interface ToastProps {
-  id?: string;
-  title?: React.ReactNode;
-  description?: React.ReactNode;
-  action?: ToastActionElement;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-  variant?: "default" | "destructive";
-}
 
 export { Toast, ToastProvider, ToastViewport, ToastTitle, ToastDescription, ToastClose };
