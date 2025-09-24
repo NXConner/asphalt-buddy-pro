@@ -68,106 +68,6 @@ async function performSearch(
 }
 
 export function OverwatchTab() {
-<<<<<<< HEAD
-    const { toast } = useToast();
-	const [provider, setProvider] = useState<MapProvider>("google_sat");
-    const [lastBaseProvider, setLastBaseProvider] = useState<Exclude<MapProvider, "county">>("google_sat");
-	const [hasGeolocation, setHasGeolocation] = useState<boolean>(false);
-	const [position, setPosition] = useState<GeolocationPosition | null>(null);
-	const [error, setError] = useState<string | null>(null);
-	const [query, setQuery] = useState<string>("");
-	const [results, setResults] = useState<GeocodeResult[]>([]);
-	const [selectedResult, setSelectedResult] = useState<GeocodeResult | null>(null);
-	const [map, setMap] = useState<L.Map | null>(null);
-	const [totals, setTotals] = useState<{ areaSqM: number; lengthM: number }>({ areaSqM: 0, lengthM: 0 });
-	const [radiusM, setRadiusM] = useState<number>(5000);
-	const [searching, setSearching] = useState<boolean>(false);
-	const [searchError, setSearchError] = useState<string | null>(null);
-const [radarFrames, setRadarFrames] = useState<string[]>([]);
-const [radarIdx, setRadarIdx] = useState<number>(0);
-const [radarPlaying, setRadarPlaying] = useState<boolean>(false);
-const [radarSpeedMs, setRadarSpeedMs] = useState<number>(500);
-const [etaText, setEtaText] = useState<string>("");
-const [tips, setTips] = useState<string[]>([]);
-	const [trackingActive, setTrackingActive] = useState<boolean>(localStorage.getItem('bgTrackingEnabled') === 'true');
-	const [lastSyncTs, setLastSyncTs] = useState<number | null>(null);
-const [etaObj, setEtaObj] = useState<{ nextStart?: Date; nextStop?: Date; currentIntensityMmPerH?: number }>({});
-const [alertsEnabled, setAlertsEnabled] = useState<boolean>(false);
-const [detectAbort, setDetectAbort] = useState<AbortController | null>(null);
-    const [countyLayers, setCountyLayers] = useState(() => {
-        const defaults = {
-            patrickVA: {
-                label: "Patrick County, VA",
-                enabled: false,
-                url: (import.meta as any)?.env?.VITE_WMS_PATRICK_URL || "",
-                layers: (import.meta as any)?.env?.VITE_WMS_PATRICK_LAYERS || "",
-                version: (import.meta as any)?.env?.VITE_WMS_PATRICK_VERSION || "1.3.0",
-                styles: (import.meta as any)?.env?.VITE_WMS_PATRICK_STYLES || ""
-            },
-            henryVA: {
-                label: "Henry County, VA",
-                enabled: false,
-                url: (import.meta as any)?.env?.VITE_WMS_HENRY_URL || "",
-                layers: (import.meta as any)?.env?.VITE_WMS_HENRY_LAYERS || "",
-                version: (import.meta as any)?.env?.VITE_WMS_HENRY_VERSION || "1.3.0",
-                styles: (import.meta as any)?.env?.VITE_WMS_HENRY_STYLES || ""
-            },
-            stokesNC: {
-                label: "Stokes County, NC",
-                enabled: false,
-                url: (import.meta as any)?.env?.VITE_WMS_STOKES_URL || "",
-                layers: (import.meta as any)?.env?.VITE_WMS_STOKES_LAYERS || "",
-                version: (import.meta as any)?.env?.VITE_WMS_STOKES_VERSION || "1.3.0",
-                styles: (import.meta as any)?.env?.VITE_WMS_STOKES_STYLES || ""
-            },
-            surryNC: {
-                label: "Surry County, NC",
-                enabled: false,
-                url: (import.meta as any)?.env?.VITE_WMS_SURRY_URL || "",
-                layers: (import.meta as any)?.env?.VITE_WMS_SURRY_LAYERS || "",
-                version: (import.meta as any)?.env?.VITE_WMS_SURRY_VERSION || "1.3.0",
-                styles: (import.meta as any)?.env?.VITE_WMS_SURRY_STYLES || ""
-            }
-        };
-        // Auto-enable any with both url and layers set
-        return {
-            patrickVA: { ...defaults.patrickVA, enabled: /^https?:\/\//i.test(defaults.patrickVA.url) && defaults.patrickVA.layers.trim().length > 0 },
-            henryVA: { ...defaults.henryVA, enabled: /^https?:\/\//i.test(defaults.henryVA.url) && defaults.henryVA.layers.trim().length > 0 },
-            stokesNC: { ...defaults.stokesNC, enabled: /^https?:\/\//i.test(defaults.stokesNC.url) && defaults.stokesNC.layers.trim().length > 0 },
-            surryNC: { ...defaults.surryNC, enabled: /^https?:\/\//i.test(defaults.surryNC.url) && defaults.surryNC.layers.trim().length > 0 },
-        };
-    });
-	// LayerGroup refs for syncing with LayersControl and external checkboxes
-	const patrickGroupRef = useRef<L.FeatureGroup | null>(null);
-	const henryGroupRef = useRef<L.FeatureGroup | null>(null);
-	const stokesGroupRef = useRef<L.FeatureGroup | null>(null);
-	const surryGroupRef = useRef<L.FeatureGroup | null>(null);
-	// Persist and restore county WMS configuration
-	useEffect(() => {
-		try {
-			const raw = localStorage.getItem('overwatch.countyLayers');
-			if (raw) {
-				const saved = JSON.parse(raw);
-				setCountyLayers((prev) => ({
-					patrickVA: { ...prev.patrickVA, ...saved.patrickVA },
-					henryVA: { ...prev.henryVA, ...saved.henryVA },
-					stokesNC: { ...prev.stokesNC, ...saved.stokesNC },
-					surryNC: { ...prev.surryNC, ...saved.surryNC },
-				}));
-			}
-		} catch {
-			// ignore
-		}
-	}, []);
-    
-	useEffect(() => {
-		try {
-			localStorage.setItem('overwatch.countyLayers', JSON.stringify(countyLayers));
-		} catch {
-			// ignore
-		}
-	}, [countyLayers]);
-=======
   const { toast } = useToast();
   const [provider, setProvider] = useState<MapProvider>('google_sat');
   const [lastBaseProvider, setLastBaseProvider] =
@@ -259,7 +159,6 @@ const [detectAbort, setDetectAbort] = useState<AbortController | null>(null);
       // ignore
     }
   }, []);
->>>>>>> origin/main
 
   useEffect(() => {
     try {
