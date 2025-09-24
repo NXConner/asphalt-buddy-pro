@@ -11,6 +11,7 @@ import { MapPin, Search } from '@/components/icons';
 import area from '@turf/area';
 import { polygon as turfPolygon } from '@turf/helpers';
 import jsPDF from 'jspdf';
+import centroid from '@turf/centroid';
 
 interface AsphaltMapProps {
   mapboxToken?: string;
@@ -27,6 +28,10 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
   const [units, setUnits] = useState<'imperial' | 'metric'>('imperial');
   const [thickness, setThickness] = useState<number>(2); // in inches (imperial) or centimeters (metric)
   const [density, setDensity] = useState<number>(145); // lb/ft^3 (imperial) or t/m^3 (metric)
+  const [showFill, setShowFill] = useState<boolean>(true);
+  const [showOutline, setShowOutline] = useState<boolean>(true);
+  const [showHeat, setShowHeat] = useState<boolean>(false);
+  const [baseStyle, setBaseStyle] = useState<'satellite' | 'streets'>('satellite');
 
   // Compute geodesic areas for detected polygons
   const areaTotals = useMemo(() => {
@@ -264,10 +269,13 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
     if (!token) return;
 
     mapboxgl.accessToken = token;
-
+    const styleUri =
+      baseStyle === 'satellite'
+        ? 'mapbox://styles/mapbox/satellite-v9'
+        : 'mapbox://styles/mapbox/streets-v12';
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/satellite-v9',
+      style: styleUri,
       center: [-74.006, 40.7128], // NYC
       zoom: 15,
     });
@@ -317,7 +325,7 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
     return () => {
       map.current?.remove();
     };
-  }, [mapboxToken, tokenInput]);
+  }, [mapboxToken, tokenInput, baseStyle]);
 
   // Add detection results to map
   useEffect(() => {
@@ -327,8 +335,17 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
     if (map.current.getLayer('asphalt-polygons')) {
       map.current.removeLayer('asphalt-polygons');
     }
+    if (map.current.getLayer('asphalt-outline')) {
+      map.current.removeLayer('asphalt-outline');
+    }
+    if (map.current.getLayer('asphalt-heat')) {
+      map.current.removeLayer('asphalt-heat');
+    }
     if (map.current.getSource('asphalt-data')) {
       map.current.removeSource('asphalt-data');
+    }
+    if (map.current.getSource('asphalt-heat-src')) {
+      map.current.removeSource('asphalt-heat-src');
     }
 
     // Add detected asphalt polygons
@@ -349,28 +366,59 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
       data: geojsonData,
     });
 
-    map.current.addLayer({
-      id: 'asphalt-polygons',
-      type: 'fill',
-      source: 'asphalt-data',
-      paint: {
-        'fill-color': '#ff6b35',
-        'fill-opacity': 0.6,
-        'fill-outline-color': '#ff4500',
-      },
-    });
+    if (showFill) {
+      map.current.addLayer({
+        id: 'asphalt-polygons',
+        type: 'fill',
+        source: 'asphalt-data',
+        paint: {
+          'fill-color': '#ff6b35',
+          'fill-opacity': 0.6,
+          'fill-outline-color': '#ff4500',
+        },
+      });
+    }
 
-    // Add outline
-    map.current.addLayer({
-      id: 'asphalt-outline',
-      type: 'line',
-      source: 'asphalt-data',
-      paint: {
-        'line-color': '#ff4500',
-        'line-width': 2,
-      },
-    });
-  }, [detectionResults]);
+    if (showOutline) {
+      map.current.addLayer({
+        id: 'asphalt-outline',
+        type: 'line',
+        source: 'asphalt-data',
+        paint: {
+          'line-color': '#ff4500',
+          'line-width': 2,
+        },
+      });
+    }
+
+    if (showHeat) {
+      try {
+        const features = {
+          type: 'FeatureCollection' as const,
+          features: detectionResults.polygons.map((poly) => {
+            const ring: [number, number][] = poly.map((p) => [p.lon, p.lat]);
+            if (ring.length > 0) {
+              const f = ring[0];
+              const l = ring[ring.length - 1];
+              if (f[0] !== l[0] || f[1] !== l[1]) ring.push([f[0], f[1]]);
+            }
+            const c = centroid(turfPolygon([ring]));
+            return { type: 'Feature' as const, properties: { weight: 1 }, geometry: c.geometry };
+          }),
+        };
+        map.current.addSource('asphalt-heat-src', { type: 'geojson', data: features as any });
+        map.current.addLayer({
+          id: 'asphalt-heat',
+          type: 'heatmap',
+          source: 'asphalt-heat-src',
+          paint: {
+            'heatmap-radius': 20,
+            'heatmap-opacity': 0.5,
+          },
+        });
+      } catch {}
+    }
+  }, [detectionResults, showFill, showOutline, showHeat]);
 
   const handleDetectAsphalt = async () => {
     if (!selectedBbox) {
@@ -478,6 +526,15 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
                 <option value="imperial">Imperial (ft²)</option>
                 <option value="metric">Metric (m²)</option>
               </select>
+              <Label className="text-xs ml-2">Base</Label>
+              <select
+                value={baseStyle}
+                onChange={(e) => setBaseStyle(e.target.value as 'satellite' | 'streets')}
+                className="border rounded px-2 py-1 bg-background text-xs"
+              >
+                <option value="satellite">Satellite</option>
+                <option value="streets">Streets</option>
+              </select>
             </div>
           </div>
 
@@ -511,6 +568,32 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
                   <span className="text-muted-foreground">Also:</span>
                   <span className="ml-2 font-mono">{formattedTotals.areaSecondary}</span>
                 </div>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={showFill}
+                    onChange={(e) => setShowFill(e.target.checked)}
+                  />
+                  <span>Detections</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={showOutline}
+                    onChange={(e) => setShowOutline(e.target.checked)}
+                  />
+                  <span>Outlines</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={showHeat}
+                    onChange={(e) => setShowHeat(e.target.checked)}
+                  />
+                  <span>Heatmap</span>
+                </label>
               </div>
               <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
                 <div className="space-y-1">
@@ -561,6 +644,32 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
                   <Button variant="outline" onClick={exportPDF}>
                     Export PDF
                   </Button>
+                  <Button
+                    onClick={() => {
+                      const m2 = areaTotals.totalM2;
+                      const sqft = m2 * 10.7639;
+                      try {
+                        localStorage.setItem(
+                          'estimatorImport',
+                          JSON.stringify({
+                            sealcoating: { area: sqft },
+                            asphaltPaving: { area: sqft },
+                          }),
+                        );
+                      } catch {}
+                      try {
+                        window.dispatchEvent(
+                          new CustomEvent('navigate-tab', { detail: { tab: 'estimator' } }),
+                        );
+                      } catch {}
+                      toast({
+                        title: 'Exported to Estimator',
+                        description: `${sqft.toFixed(0)} sq ft`,
+                      });
+                    }}
+                  >
+                    Export to Estimator
+                  </Button>
                 </div>
               </div>
             </div>
@@ -576,6 +685,24 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
             Area selected for analysis
           </div>
         )}
+        <div className="absolute bottom-2 left-2 bg-background/90 backdrop-blur-sm border rounded px-2 py-2 text-xs space-y-1">
+          <div className="font-medium">Legend</div>
+          <div className="flex items-center gap-2">
+            <span
+              className="inline-block w-3 h-3"
+              style={{ background: '#ff6b35', opacity: 0.6 }}
+            ></span>
+            <span>Detections</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-3 h-3 border" style={{ borderColor: '#ff4500' }}></span>
+            <span>Outline</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-3 h-3 bg-gradient-to-r from-orange-300 to-red-600"></span>
+            <span>Heatmap</span>
+          </div>
+        </div>
       </div>
     </div>
   );

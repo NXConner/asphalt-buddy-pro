@@ -1,20 +1,28 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calculator, DollarSign, TrendingUp, FileText, Settings, Save, MapPin } from "@/components/icons";
-import { useToast } from "@/hooks/use-toast";
-import AsphaltMap from "./AsphaltMap";
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Calculator,
+  DollarSign,
+  TrendingUp,
+  FileText,
+  Settings,
+  Save,
+  MapPin,
+} from '@/components/icons';
+import { useToast } from '@/hooks/use-toast';
+import AsphaltMap from './AsphaltMap';
 
 const AsphaltEstimator = () => {
   const { toast } = useToast();
   const [measurements, setMeasurements] = useState({
-    length: "",
-    width: "",
-    thickness: ""
+    length: '',
+    width: '',
+    thickness: '',
   });
 
   const [costs, setCosts] = useState({
@@ -22,14 +30,47 @@ const AsphaltEstimator = () => {
     laborCost: 0,
     equipmentCost: 0,
     totalCost: 0,
-    profitMargin: 15
+    profitMargin: 15,
   });
 
   const [estimateData, setEstimateData] = useState({
     area: 0,
     volume: 0,
-    tonnage: 0
+    tonnage: 0,
   });
+
+  const [activeTab, setActiveTab] = useState<string>('detection');
+
+  useEffect(() => {
+    function onNavigate(e: Event) {
+      try {
+        const detail = (e as CustomEvent).detail as any;
+        if (detail?.tab) setActiveTab(String(detail.tab));
+      } catch {}
+    }
+    window.addEventListener('navigate-tab', onNavigate as any);
+    return () => window.removeEventListener('navigate-tab', onNavigate as any);
+  }, []);
+
+  useEffect(() => {
+    // Pull in area from AI map export
+    try {
+      const raw = localStorage.getItem('estimatorImport');
+      if (raw) {
+        const data = JSON.parse(raw);
+        const areaSqFt = Number(data?.asphaltPaving?.area ?? data?.sealcoating?.area ?? 0);
+        if (!Number.isNaN(areaSqFt) && areaSqFt > 0) {
+          setMeasurements((prev) => ({ ...prev, length: areaSqFt.toFixed(0), width: '1' }));
+          // area is length*width in calculator; set width=1 to display area directly
+          toast({
+            title: 'Area imported',
+            description: `${areaSqFt.toFixed(0)} sq ft from AI Detection`,
+          });
+          setActiveTab('calculator');
+        }
+      }
+    } catch {}
+  }, []);
 
   // Calculate estimates when measurements change
   useEffect(() => {
@@ -39,7 +80,7 @@ const AsphaltEstimator = () => {
 
     const area = length * width; // square feet
     const volume = (area * thickness) / 12; // cubic feet (thickness in inches)
-    const tonnage = volume * 145 / 2000; // approximate weight in tons
+    const tonnage = (volume * 145) / 2000; // approximate weight in tons
 
     setEstimateData({ area, volume, tonnage });
 
@@ -50,26 +91,26 @@ const AsphaltEstimator = () => {
     const subtotal = materialCost + laborCost + equipmentCost;
     const totalCost = subtotal * (1 + costs.profitMargin / 100);
 
-    setCosts(prev => ({
+    setCosts((prev) => ({
       ...prev,
       materialCost,
       laborCost,
       equipmentCost,
-      totalCost
+      totalCost,
     }));
   }, [measurements, costs.profitMargin]);
 
   const handleInputChange = (field: string, value: string) => {
-    setMeasurements(prev => ({
+    setMeasurements((prev) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
 
   const saveEstimate = () => {
     toast({
-      title: "Estimate Saved",
-      description: "Your asphalt estimate has been saved successfully.",
+      title: 'Estimate Saved',
+      description: 'Your asphalt estimate has been saved successfully.',
     });
   };
 
@@ -78,9 +119,9 @@ const AsphaltEstimator = () => {
       measurements,
       estimateData,
       costs,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
-    
+
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -92,8 +133,8 @@ const AsphaltEstimator = () => {
     URL.revokeObjectURL(url);
 
     toast({
-      title: "Estimate Exported",
-      description: "Your estimate has been downloaded as a JSON file.",
+      title: 'Estimate Exported',
+      description: 'Your estimate has been downloaded as a JSON file.',
     });
   };
 
@@ -103,10 +144,12 @@ const AsphaltEstimator = () => {
         {/* Header */}
         <div className="text-center space-y-2">
           <h1 className="text-4xl font-bold text-primary">Asphalt Cost Estimator</h1>
-          <p className="text-muted-foreground">Professional asphalt project estimation and planning</p>
+          <p className="text-muted-foreground">
+            Professional asphalt project estimation and planning
+          </p>
         </div>
 
-        <Tabs defaultValue="detection" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid grid-cols-5 w-full max-w-2xl mx-auto">
             <TabsTrigger value="detection" className="flex items-center gap-2">
               <MapPin className="w-4 h-4" />
@@ -154,7 +197,7 @@ const AsphaltEstimator = () => {
                         id="length"
                         type="number"
                         value={measurements.length}
-                        onChange={(e) => handleInputChange("length", e.target.value)}
+                        onChange={(e) => handleInputChange('length', e.target.value)}
                         placeholder="Enter length"
                       />
                     </div>
@@ -164,7 +207,7 @@ const AsphaltEstimator = () => {
                         id="width"
                         type="number"
                         value={measurements.width}
-                        onChange={(e) => handleInputChange("width", e.target.value)}
+                        onChange={(e) => handleInputChange('width', e.target.value)}
                         placeholder="Enter width"
                       />
                     </div>
@@ -175,7 +218,7 @@ const AsphaltEstimator = () => {
                       id="thickness"
                       type="number"
                       value={measurements.thickness}
-                      onChange={(e) => handleInputChange("thickness", e.target.value)}
+                      onChange={(e) => handleInputChange('thickness', e.target.value)}
                       placeholder="Enter thickness"
                     />
                   </div>
@@ -185,7 +228,12 @@ const AsphaltEstimator = () => {
                       id="profit"
                       type="number"
                       value={costs.profitMargin}
-                      onChange={(e) => setCosts(prev => ({ ...prev, profitMargin: parseFloat(e.target.value) || 0 }))}
+                      onChange={(e) =>
+                        setCosts((prev) => ({
+                          ...prev,
+                          profitMargin: parseFloat(e.target.value) || 0,
+                        }))
+                      }
                       placeholder="Enter profit margin"
                     />
                   </div>
@@ -242,7 +290,11 @@ const AsphaltEstimator = () => {
                       <Save className="w-4 h-4" />
                       Save Estimate
                     </Button>
-                    <Button onClick={exportEstimate} variant="outline" className="flex items-center gap-2 flex-1">
+                    <Button
+                      onClick={exportEstimate}
+                      variant="outline"
+                      className="flex items-center gap-2 flex-1"
+                    >
                       <FileText className="w-4 h-4" />
                       Export
                     </Button>
