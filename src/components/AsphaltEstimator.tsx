@@ -115,8 +115,16 @@ const AsphaltEstimator = () => {
       id: Date.now().toString(),
       projectName: `Project ${new Date().toLocaleDateString()}`,
       location: 'Current Location',
-      measurements: estimateData,
-      costs,
+      measurements: {
+        ...estimateData,
+        thickness: parseFloat(measurements.thickness) || 0,
+      },
+      costs: {
+        materials: costs.materialCost,
+        labor: costs.laborCost,
+        equipment: costs.equipmentCost,
+        total: costs.totalCost,
+      },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
