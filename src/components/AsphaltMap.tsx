@@ -32,12 +32,18 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
   const [showOutline, setShowOutline] = useState<boolean>(true);
   const [showHeat, setShowHeat] = useState<boolean>(false);
   const [baseStyle, setBaseStyle] = useState<'satellite' | 'streets'>('satellite');
+  const [minAreaInput, setMinAreaInput] = useState<number>(0); // displayed in current unit system
+
+  const minAreaM2 = useMemo(() => {
+    const val = Number(minAreaInput) || 0;
+    return units === 'metric' ? val : val / 10.7639; // ft² -> m²
+  }, [minAreaInput, units]);
 
   // Compute geodesic areas for detected polygons
   const areaTotals = useMemo(() => {
     if (!detectionResults) return { perM2: [] as number[], totalM2: 0 };
     try {
-      const perM2 = detectionResults.polygons.map((poly) => {
+      const perM2Raw = detectionResults.polygons.map((poly) => {
         const ring: [number, number][] = poly.map((p) => [p.lon, p.lat]);
         if (ring.length > 0) {
           const first = ring[0];
@@ -49,12 +55,13 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
         const feature = turfPolygon([ring]);
         return area(feature);
       });
+      const perM2 = perM2Raw.filter((a) => (Number.isFinite(a) ? a : 0) >= minAreaM2);
       const totalM2 = perM2.reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0);
       return { perM2, totalM2 };
     } catch {
       return { perM2: [], totalM2: 0 };
     }
-  }, [detectionResults]);
+  }, [detectionResults, minAreaM2]);
 
   const formattedTotals = useMemo(() => {
     const m2 = areaTotals.totalM2;
@@ -143,6 +150,55 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
     const a = document.createElement('a');
     a.href = url;
     a.download = `asphalt-detections-${new Date().toISOString().split('T')[0]}.geojson`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function exportOutlines() {
+    if (!detectionResults) return;
+    const features = detectionResults.polygons
+      .map((poly, index) => {
+        const coords = poly.map((p) => [p.lon, p.lat] as [number, number]);
+        const closed = [...coords];
+        if (closed.length > 0) {
+          const f = closed[0];
+          const l = closed[closed.length - 1];
+          if (f[0] !== l[0] || f[1] !== l[1]) closed.push([f[0], f[1]]);
+        }
+        // Filter by min area
+        let aM2 = 0;
+        try {
+          aM2 = area(turfPolygon([closed]));
+        } catch {}
+        if (aM2 < minAreaM2) return null;
+        return {
+          type: 'Feature' as const,
+          properties: { id: index, area_m2: aM2 },
+          geometry: { type: 'LineString' as const, coordinates: closed },
+        };
+      })
+      .filter(Boolean) as any[];
+    const gj = {
+      type: 'FeatureCollection' as const,
+      features,
+      metadata: {
+        bbox: detectionResults.bbox,
+        units,
+        assumptions: {
+          thickness: units === 'metric' ? `${thickness} cm` : `${thickness} in`,
+          density: units === 'metric' ? `${density} t/m^3` : `${density} lb/ft^3`,
+          min_area_m2: minAreaM2,
+        },
+        generated_at: new Date().toISOString(),
+      },
+    };
+    const blob = new Blob([JSON.stringify(gj, null, 2)], { type: 'application/geo+json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `asphalt-outlines-${new Date().toISOString().split('T')[0]}.geojson`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -348,17 +404,33 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
       map.current.removeSource('asphalt-heat-src');
     }
 
-    // Add detected asphalt polygons
+    // Add detected asphalt polygons (apply min area filter)
     const geojsonData = {
       type: 'FeatureCollection' as const,
-      features: detectionResults.polygons.map((polygon, index) => ({
-        type: 'Feature' as const,
-        properties: { id: index },
-        geometry: {
-          type: 'Polygon' as const,
-          coordinates: [polygon.map((point) => [point.lon, point.lat])],
-        },
-      })),
+      features: detectionResults.polygons
+        .map((polygon, index) => {
+          const coords = polygon.map((point) => [point.lon, point.lat] as [number, number]);
+          // ensure closed ring for area calc
+          const ring = [...coords];
+          if (ring.length > 0) {
+            const f = ring[0];
+            const l = ring[ring.length - 1];
+            if (f[0] !== l[0] || f[1] !== l[1]) ring.push([f[0], f[1]]);
+          }
+          const aM2 = (() => {
+            try {
+              return area(turfPolygon([ring]));
+            } catch {
+              return 0;
+            }
+          })();
+          return {
+            type: 'Feature' as const,
+            properties: { id: index, area_m2: aM2 },
+            geometry: { type: 'Polygon' as const, coordinates: [coords] },
+          };
+        })
+        .filter((f) => (Number(f.properties.area_m2) || 0) >= minAreaM2),
     };
 
     map.current.addSource('asphalt-data', {
@@ -418,7 +490,53 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
         });
       } catch {}
     }
-  }, [detectionResults, showFill, showOutline, showHeat]);
+    // Click popup for per-polygon metrics
+    const clickHandler = (e: any) => {
+      try {
+        const f = e.features?.[0];
+        const aM2 = Number(f?.properties?.area_m2) || 0;
+        const vol = (() => {
+          if (units === 'metric') {
+            const thicknessM = (thickness || 0) / 100; // cm -> m
+            return aM2 * thicknessM;
+          }
+          const sqft = aM2 * 10.7639;
+          const thicknessFt = (thickness || 0) / 12;
+          return sqft * thicknessFt;
+        })();
+        const tons = (() => {
+          if (units === 'metric') return vol * (density || 0);
+          const pounds = vol * (density || 0);
+          return pounds / 2000;
+        })();
+        const content =
+          units === 'metric'
+            ? `<div style="font-family: ui-sans-serif, system-ui; font-size:12px"><div><b>Area</b>: ${aM2.toFixed(0)} m²</div><div><b>Volume</b>: ${vol.toFixed(2)} m³</div><div><b>Tonnage</b>: ${tons.toFixed(1)} t</div></div>`
+            : `<div style="font-family: ui-sans-serif, system-ui; font-size:12px"><div><b>Area</b>: ${(aM2 * 10.7639).toFixed(0)} ft²</div><div><b>Volume</b>: ${vol.toFixed(0)} ft³</div><div><b>Tonnage</b>: ${tons.toFixed(1)} tons</div></div>`;
+        new mapboxgl.Popup({ closeButton: false })
+          .setLngLat(e.lngLat)
+          .setHTML(content)
+          .addTo(map.current!);
+      } catch {}
+    };
+    if (showFill && map.current.getLayer('asphalt-polygons')) {
+      map.current.on('click', 'asphalt-polygons', clickHandler);
+    }
+    if (showOutline && map.current.getLayer('asphalt-outline')) {
+      map.current.on('click', 'asphalt-outline', clickHandler);
+    }
+
+    return () => {
+      try {
+        if (map.current?.getLayer('asphalt-polygons'))
+          map.current.off('click', 'asphalt-polygons', clickHandler);
+      } catch {}
+      try {
+        if (map.current?.getLayer('asphalt-outline'))
+          map.current.off('click', 'asphalt-outline', clickHandler);
+      } catch {}
+    };
+  }, [detectionResults, showFill, showOutline, showHeat, minAreaM2, units, thickness, density]);
 
   const handleDetectAsphalt = async () => {
     if (!selectedBbox) {
@@ -595,6 +713,17 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
                   <span>Heatmap</span>
                 </label>
               </div>
+              <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
+                <div className="space-y-1">
+                  <Label className="text-xs">Min Area ({units === 'metric' ? 'm²' : 'ft²'})</Label>
+                  <Input
+                    type="number"
+                    value={minAreaInput}
+                    onChange={(e) => setMinAreaInput(parseFloat(e.target.value) || 0)}
+                    className="h-8"
+                  />
+                </div>
+              </div>
               <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
                 <div className="space-y-1">
                   <Label className="text-xs">Thickness ({units === 'metric' ? 'cm' : 'in'})</Label>
@@ -643,6 +772,9 @@ const AsphaltMap: React.FC<AsphaltMapProps> = ({ mapboxToken }) => {
                   </Button>
                   <Button variant="outline" onClick={exportPDF}>
                     Export PDF
+                  </Button>
+                  <Button variant="outline" onClick={exportOutlines}>
+                    Export Outlines (GeoJSON)
                   </Button>
                   <Button
                     onClick={() => {
