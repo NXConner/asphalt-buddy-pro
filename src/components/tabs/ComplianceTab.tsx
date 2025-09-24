@@ -1,7 +1,9 @@
-import React, { useState, type ReactNode } from "react";
+import React, { useState } from "react";
+
+type ReactNode = React.ReactNode;
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/fixed-accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type RegionKey = 'general' | 'va' | 'nc';

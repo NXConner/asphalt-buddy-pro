@@ -39,7 +39,16 @@ export function OverwatchTab() {
   const [etaObj, setEtaObj] = useState<{ nextStart?: Date; nextStop?: Date; currentIntensityMmPerH?: number }>({});
   const [alertsEnabled, setAlertsEnabled] = useState<boolean>(false);
   const [detectAbort, setDetectAbort] = useState<AbortController | null>(null);
-  const [countyLayers, setCountyLayers] = useState(() => {
+  const [countyLayers, setCountyLayers] = useState<{
+    [key: string]: {
+      label: string;
+      url: string;
+      layers: string;
+      version: string;
+      styles: string;
+      enabled: boolean;
+    }
+  }>(() => {
     const defaults = {
       patrickVA: {
         label: "Patrick County, VA",
